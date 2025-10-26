@@ -6,79 +6,40 @@ import {
   cardsMap,
   batonMap,
   addPlayer,
-  createZone,
-  addCard,
   moveCard,
   setCardTapped,
   getTurnBaton,
   setTurnBaton,
+  getPlayerColor,
   Card as CardType,
   Zone as ZoneType,
+  Player,
   provider,
   getRoomName,
 } from './store'
 import { Zone } from './Zone'
+import { JoinModal } from './JoinModal'
 
 function App() {
-  const [initialized, setInitialized] = useState(false)
+  const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
+  const [showJoinModal, setShowJoinModal] = useState(false)
   const [currentTurn, setCurrentTurn] = useState<string>('')
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [, forceUpdate] = useState({})
 
-  // Player colors
-  const playerColors = {
-    player1: '#4CAF50',
-    player2: '#2196F3',
-  }
-
   useEffect(() => {
-    // Initialize some sample data
-    const initGame = () => {
-      // Add players if not already present
-      if (playersMap.size === 0) {
-        addPlayer('player1', 'Alice')
-        addPlayer('player2', 'Bob')
-      }
+    // Check if player already joined this room
+    const storageKey = `crdt-cards-player-${getRoomName()}`
+    const savedPlayerId = localStorage.getItem(storageKey)
 
-      // Create zones if not already present
-      if (zonesMap.size === 0) {
-        createZone('deck-player1', 'deck', 'player1')
-        createZone('hand-player1', 'hand', 'player1')
-        createZone('battlefield-player1', 'battlefield', 'player1')
-        createZone('graveyard-player1', 'graveyard', 'player1')
-
-        createZone('deck-player2', 'deck', 'player2')
-        createZone('hand-player2', 'hand', 'player2')
-        createZone('battlefield-player2', 'battlefield', 'player2')
-        createZone('graveyard-player2', 'graveyard', 'player2')
-
-        createZone('battlefield-shared', 'battlefield') // shared zone
-      }
-
-      // Add some sample cards if not already present
-      if (cardsMap.size === 0) {
-        // Player 1's cards
-        addCard('card1', 'Lightning Bolt', 'player1', 'hand-player1', 0)
-        addCard('card2', 'Forest', 'player1', 'hand-player1', 1)
-        addCard('card3', 'Grizzly Bears', 'player1', 'battlefield-player1', 0)
-        addCard('card4', 'Giant Growth', 'player1', 'hand-player1', 2)
-
-        // Player 2's cards
-        addCard('card5', 'Counterspell', 'player2', 'hand-player2', 0)
-        addCard('card6', 'Island', 'player2', 'battlefield-player2', 0)
-        addCard('card7', 'Serra Angel', 'player2', 'battlefield-player2', 1)
-      }
-
-      // Set initial turn if not set
-      if (!getTurnBaton()) {
-        setTurnBaton('player1', 'main1')
-      }
-
-      setInitialized(true)
+    if (savedPlayerId && playersMap.has(savedPlayerId)) {
+      // Player already exists in this room
+      setCurrentPlayerId(savedPlayerId)
+    } else {
+      // New player needs to join
+      setShowJoinModal(true)
     }
-
-    initGame()
 
     // Subscribe to WebRTC connection status
     const handleStatus = (event: { connected: boolean }) => {
@@ -87,6 +48,13 @@ function App() {
 
     const handleSynced = (event: { synced: boolean }) => {
       setSynced(event.synced)
+      // After sync, check if saved player still exists
+      if (savedPlayerId && !playersMap.has(savedPlayerId)) {
+        // Player was removed, show join modal again
+        localStorage.removeItem(storageKey)
+        setCurrentPlayerId(null)
+        setShowJoinModal(true)
+      }
     }
 
     provider.on('status', handleStatus)
@@ -120,24 +88,31 @@ function App() {
     }
   }, [])
 
-  const handleTapCard = () => {
-    setCardTapped('card3', true, 'player1')
-  }
+  const handleJoin = (name: string) => {
+    const playerId = crypto.randomUUID()
+    addPlayer(playerId, name)
 
-  const handleUntapCard = () => {
-    setCardTapped('card3', false, 'player1')
-  }
+    // Save to localStorage
+    const storageKey = `crdt-cards-player-${getRoomName()}`
+    localStorage.setItem(storageKey, playerId)
 
-  const handleMoveCard = () => {
-    moveCard('card1', 'battlefield-player1', 1, 'player1')
+    setCurrentPlayerId(playerId)
+    setShowJoinModal(false)
+
+    // Set initial turn to first player if not set
+    if (!getTurnBaton() && playersMap.size === 1) {
+      setTurnBaton(playerId, 'main1')
+    }
   }
 
   const handleNextTurn = () => {
     const baton = getTurnBaton()
-    if (baton) {
-      // Simple turn rotation: player1 -> player2 -> player1
-      const nextPlayer = baton.playerId === 'player1' ? 'player2' : 'player1'
-      setTurnBaton(nextPlayer, 'main1')
+    const playerIds = Array.from(playersMap.keys())
+
+    if (baton && playerIds.length > 0) {
+      const currentIndex = playerIds.indexOf(baton.playerId)
+      const nextIndex = (currentIndex + 1) % playerIds.length
+      setTurnBaton(playerIds[nextIndex], 'main1')
     }
   }
 
@@ -163,12 +138,21 @@ function App() {
     return zones
   }
 
-  if (!initialized) {
-    return <div>Loading...</div>
+  // Get all players as array
+  const players: Array<{ id: string; player: Player }> = []
+  playersMap.forEach((player, id) => {
+    players.push({ id, player })
+  })
+
+  if (showJoinModal) {
+    return <JoinModal onJoin={handleJoin} playerCount={playersMap.size} />
   }
 
-  const player1Zones = getPlayerZones('player1')
-  const player2Zones = getPlayerZones('player2')
+  if (!currentPlayerId) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>
+  }
+
+  const currentPlayer = playersMap.get(currentPlayerId)
 
   return (
     <div
@@ -192,7 +176,13 @@ function App() {
         <h1 style={{ margin: '0 0 0.5rem 0' }}>CRDT Cards</h1>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <strong>Current Turn:</strong> {currentTurn}
+            <strong>You:</strong> {currentPlayer?.name || 'Unknown'}
+            {currentTurn && (
+              <>
+                {' | '}
+                <strong>Turn:</strong> {currentTurn}
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.875rem' }}>
             <div>
@@ -220,7 +210,7 @@ function App() {
         </div>
       </div>
 
-      {/* Controls */}
+      {/* Players List */}
       <div
         style={{
           backgroundColor: '#fff',
@@ -230,141 +220,113 @@ function App() {
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
         }}
       >
-        <h3 style={{ marginTop: 0 }}>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={handleTapCard}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Tap Grizzly Bears
-          </button>
-          <button
-            onClick={handleUntapCard}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Untap Grizzly Bears
-          </button>
-          <button
-            onClick={handleMoveCard}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#FF9800',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Play Lightning Bolt
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>Players ({players.length}/4)</h3>
           <button
             onClick={handleNextTurn}
+            disabled={players.length === 0}
             style={{
               padding: '0.5rem 1rem',
-              backgroundColor: '#9C27B0',
+              backgroundColor: players.length > 0 ? '#9C27B0' : '#ccc',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: 'pointer',
+              cursor: players.length > 0 ? 'pointer' : 'not-allowed',
+              fontWeight: 'bold',
             }}
           >
             Next Turn
           </button>
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {players.map(({ id, player }) => (
+            <div
+              key={id}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: getPlayerColor(id),
+                color: 'white',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              {player.name}
+              {id === currentPlayerId && ' (You)'}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Game Board */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        {/* Player 1 Board */}
-        <div
-          style={{
-            backgroundColor: '#fff',
-            padding: '1rem',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2
-            style={{
-              margin: '0 0 1rem 0',
-              color: playerColors.player1,
-              borderBottom: `3px solid ${playerColors.player1}`,
-              paddingBottom: '0.5rem',
-            }}
-          >
-            Alice (Player 1)
-          </h2>
-          {player1Zones.map(({ id, zone }) => (
-            <Zone
-              key={id}
-              zoneName={id.replace('player1', 'P1').replace('-', ' ')}
-              zoneType={zone.type}
-              cards={getZoneCards(id)}
-              playerColor={playerColors.player1}
-            />
-          ))}
-        </div>
+      {/* Game Board - 2x2 Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: players.length === 1 ? '1fr' : '1fr 1fr',
+          gap: '1rem',
+        }}
+      >
+        {players.map(({ id, player }) => {
+          const zones = getPlayerZones(id)
+          const playerColor = getPlayerColor(id)
 
-        {/* Player 2 Board */}
-        <div
-          style={{
-            backgroundColor: '#fff',
-            padding: '1rem',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2
-            style={{
-              margin: '0 0 1rem 0',
-              color: playerColors.player2,
-              borderBottom: `3px solid ${playerColors.player2}`,
-              paddingBottom: '0.5rem',
-            }}
-          >
-            Bob (Player 2)
-          </h2>
-          {player2Zones.map(({ id, zone }) => (
-            <Zone
+          return (
+            <div
               key={id}
-              zoneName={id.replace('player2', 'P2').replace('-', ' ')}
-              zoneType={zone.type}
-              cards={getZoneCards(id)}
-              playerColor={playerColors.player2}
-            />
-          ))}
-        </div>
+              style={{
+                backgroundColor: '#fff',
+                padding: '1rem',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              }}
+            >
+              <h2
+                style={{
+                  margin: '0 0 1rem 0',
+                  color: playerColor,
+                  borderBottom: `3px solid ${playerColor}`,
+                  paddingBottom: '0.5rem',
+                }}
+              >
+                {player.name}
+                {id === currentPlayerId && ' (You)'}
+              </h2>
+              {zones.map(({ id: zoneId, zone }) => (
+                <Zone
+                  key={zoneId}
+                  zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
+                  zoneType={zone.type}
+                  cards={getZoneCards(zoneId)}
+                  playerColor={playerColor}
+                />
+              ))}
+            </div>
+          )
+        })}
       </div>
 
       {/* Info Footer */}
-      <div
-        style={{
-          marginTop: '1rem',
-          padding: '1rem',
-          backgroundColor: '#fff',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          fontSize: '0.875rem',
-          color: '#666',
-        }}
-      >
-        <strong>💡 Tip:</strong> Open this app in multiple browser windows to see real-time
-        collaboration! All game state changes sync automatically across clients.
-      </div>
+      {players.length < 4 && (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: '#fff',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            fontSize: '0.875rem',
+            color: '#666',
+            textAlign: 'center',
+          }}
+        >
+          <strong>💡 Waiting for players...</strong>
+          <br />
+          Share this URL with friends: <code style={{ backgroundColor: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{window.location.href}</code>
+        </div>
+      )}
     </div>
   )
 }

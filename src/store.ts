@@ -60,11 +60,78 @@ export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/au
 // ============================================================================
 
 /**
- * Add a new player to the game
+ * Player colors assigned in order
+ */
+const PLAYER_COLORS = ['#4CAF50', '#2196F3', '#F44336', '#9C27B0']
+
+/**
+ * Get assigned color for a player based on join order
+ */
+export function getPlayerColor(playerId: string): string {
+  const players = Array.from(playersMap.keys())
+  const index = players.indexOf(playerId)
+  return index >= 0 && index < PLAYER_COLORS.length
+    ? PLAYER_COLORS[index]
+    : '#757575' // Gray fallback
+}
+
+/**
+ * Add a new player to the game with zones and sample cards
  */
 export function addPlayer(playerId: string, name: string): void {
+  // Don't allow more than 4 players
+  if (playersMap.size >= 4) {
+    console.warn('Maximum of 4 players reached')
+    return
+  }
+
   playersMap.set(playerId, { name })
+
+  // Create zones for this player
+  createZone(`deck-${playerId}`, 'deck', playerId)
+  createZone(`hand-${playerId}`, 'hand', playerId)
+  createZone(`battlefield-${playerId}`, 'battlefield', playerId)
+  createZone(`graveyard-${playerId}`, 'graveyard', playerId)
+
+  // Add sample cards
+  addSampleCardsForPlayer(playerId)
+
   logEvent(playerId, 'player_joined', { name })
+}
+
+/**
+ * Add sample cards for a new player
+ */
+function addSampleCardsForPlayer(playerId: string): void {
+  const sampleCards = [
+    'Lightning Bolt',
+    'Giant Growth',
+    'Counterspell',
+    'Swords to Plowshares',
+    'Dark Ritual',
+  ]
+
+  // Add 3 cards to hand
+  for (let i = 0; i < 3; i++) {
+    addCard(
+      `${playerId}-card-${i}`,
+      sampleCards[i],
+      playerId,
+      `hand-${playerId}`,
+      i
+    )
+  }
+
+  // Add 2 cards to battlefield
+  for (let i = 3; i < 5; i++) {
+    addCard(
+      `${playerId}-card-${i}`,
+      sampleCards[i],
+      playerId,
+      `battlefield-${playerId}`,
+      i - 3
+    )
+  }
 }
 
 /**
