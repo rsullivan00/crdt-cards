@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Card as CardType, moveCardToZone, setCardTapped } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters } from './store'
+import { NumberInputModal } from './NumberInputModal'
+import { TextInputModal } from './TextInputModal'
 
 interface CardProps {
   card: CardType
@@ -10,6 +12,10 @@ interface CardProps {
 
 export function Card({ card, cardId, playerColor, playerId }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [counterModal, setCounterModal] = useState<{
+    type: 'set' | 'add'
+    counterType?: string
+  } | null>(null)
 
   const cardStyle: React.CSSProperties = {
     width: '120px',
@@ -267,10 +273,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
               → Deck (top)
             </div>
             <div
-              style={{
-                ...menuItemStyle,
-                borderBottom: 'none',
-              }}
+              style={menuItemStyle}
               onClick={() => handleMove('deck', 'bottom')}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#f5f5f5'
@@ -281,8 +284,147 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
             >
               → Deck (bottom)
             </div>
+
+            {/* Counters Section */}
+            <div
+              style={{
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                color: '#666',
+                backgroundColor: '#f9f9f9',
+                borderBottom: '1px solid #eee',
+              }}
+            >
+              COUNTERS
+            </div>
+
+            {/* List existing counters */}
+            {Object.entries(card.counters).map(([type, count]) => (
+              <div
+                key={type}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.75rem',
+                  borderBottom: '1px solid #eee',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontWeight: 'bold' }}>
+                  {type}: {count}
+                </span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      modifyCounters(cardId, type, 1, playerId)
+                    }}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '0.7rem',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    +1
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      modifyCounters(cardId, type, -1, playerId)
+                    }}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '0.7rem',
+                      backgroundColor: '#F44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    -1
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCounterModal({ type: 'set', counterType: type })
+                      setShowMenu(false)
+                    }}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '0.7rem',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    Set
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Add Counter Type button */}
+            <div
+              style={{
+                ...menuItemStyle,
+                borderBottom: 'none',
+                color: '#4CAF50',
+                fontWeight: 'bold',
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setCounterModal({ type: 'add' })
+                setShowMenu(false)
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f5f5f5'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white'
+              }}
+            >
+              + Add Counter Type
+            </div>
           </div>
         </>
+      )}
+
+      {/* Counter Modals */}
+      {counterModal?.type === 'set' && counterModal.counterType && (
+        <NumberInputModal
+          title={`Set ${counterModal.counterType} counters`}
+          max={99}
+          onConfirm={(value) => {
+            const current = card.counters[counterModal.counterType!] || 0
+            modifyCounters(cardId, counterModal.counterType!, value - current, playerId)
+            setCounterModal(null)
+          }}
+          onCancel={() => setCounterModal(null)}
+        />
+      )}
+
+      {counterModal?.type === 'add' && (
+        <TextInputModal
+          title="Add Counter Type"
+          placeholder="e.g., +1/+1, Loyalty, Charge"
+          onConfirm={(counterType) => {
+            modifyCounters(cardId, counterType, 1, playerId)
+            setCounterModal(null)
+          }}
+          onCancel={() => setCounterModal(null)}
+        />
       )}
     </div>
   )
