@@ -4,6 +4,7 @@ import {
   playersMap,
   zonesMap,
   cardsMap,
+  batonMap,
   addPlayer,
   createZone,
   addCard,
@@ -104,6 +105,7 @@ function App() {
     playersMap.observe(updateUI)
     zonesMap.observe(updateUI)
     cardsMap.observe(updateUI)
+    batonMap.observe(updateUI)
 
     // Initial update
     updateUI()
@@ -112,6 +114,7 @@ function App() {
       playersMap.unobserve(updateUI)
       zonesMap.unobserve(updateUI)
       cardsMap.unobserve(updateUI)
+      batonMap.unobserve(updateUI)
       provider.off('status', handleStatus)
       provider.off('synced', handleSynced)
     }
