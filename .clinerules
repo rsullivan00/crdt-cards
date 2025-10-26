@@ -1,0 +1,160 @@
+# CRDT Cards - Cline Rules & Project Context
+
+## Project Overview
+CRDT Cards is a real-time multiplayer card game built with Conflict-free Replicated Data Types (CRDTs) using YJS. Players can join game rooms, see each other's cards, and interact in real-time without a central server - all state is synchronized peer-to-peer via WebRTC.
+
+## Tech Stack
+- **React 18** with TypeScript
+- **YJS** - CRDT library for distributed state
+- **y-webrtc** - WebRTC provider for P2P sync
+- **Vite** - Build tool and dev server
+
+## Architecture
+
+### Data Model (store.ts)
+The game state is stored in YJS Maps:
+- `playersMap`: Map<playerId, Player> - Player names
+- `zonesMap`: Map<zoneId, Zone> - Game zones (deck, hand, battlefield, graveyard)
+- `cardsMap`: Map<cardId, Card> - Card state with counters, attachments, metadata
+- `batonMap`: Map<'current', Baton> - Current turn tracker
+- `logArray`: Array<GameEvent> - Event log for audit/undo
+
+### Card Structure
+```typescript
+{
+  oracleId: string,           // Reference to card data (not stored in CRDT)
+  owner: string,              // playerId
+  zoneId: string,             // Which zone it's in
+  order: number,              // Position in zone (for stable ordering)
+  faceDown: boolean,
+  tapped: boolean,
+  counters: { [type: string]: number },  // Plain object, NOT Map
+  attachments: string[],      // Array of cardIds
+  metadata: { [key: string]: any },      // Plain object, NOT Map
+  v: number                   // Version for conflict resolution
+}
+```
+
+### Component Structure
+- `App.tsx` - Main app, player join logic, dynamic board rendering
+- `JoinModal.tsx` - Player name entry on first visit
+- `Card.tsx` - Individual card rendering with visual states
+- `Zone.tsx` - Container for cards in a zone
+- `store.ts` - YJS setup, data model, helper functions
+
+## Critical Design Decisions
+
+### 1. Plain Objects vs JavaScript Maps
+**DO NOT use `new Map()` for nested structures in YJS documents.**
+- YJS cannot properly serialize ES6 Maps
+- Use plain objects `{}` instead for counters and metadata
+- This was a bug we fixed - caused crashes when syncing between tabs
+
+### 2. WebRTC Provider Setup
+- Uses public signaling servers (signaling.yjs.dev, etc.)
+- Room names are namespaced: `crdt-cards-${roomId}`
+- Room ID comes from URL hash: `#game-room` → room "crdt-cards-game-room"
+- No collision risk with other apps due to namespace prefix
+
+### 3. Player Identity
+- Players get unique IDs via `crypto.randomUUID()`
+- Stored in localStorage per room: `crdt-cards-player-${roomName}`
+- Players are auto-recognized when returning to same room
+- Max 4 players per room (enforced in addPlayer function)
+
+### 4. State Management Pattern
+YJS updates don't trigger React re-renders automatically. We use observers:
+```typescript
+playersMap.observe(updateUI)
+cardsMap.observe(updateUI)
+batonMap.observe(updateUI)  // Don't forget this for turn changes!
+```
+Always remember to unobserve in cleanup.
+
+## Key Files & Their Purposes
+
+### src/store.ts
+- **Exports**: All YJS maps, helper functions, WebRTC provider
+- **Important functions**:
+  - `addPlayer()` - Creates player + zones + sample cards
+  - `getPlayerColor()` - Assigns colors in join order
+  - `moveCard()`, `updateCard()` - Always increment `v` for conflict resolution
+  - `setTurnBaton()` - Update turn state
+- **Provider setup**: WebRTC initialization at module level
+
+### src/App.tsx
+- **Player join flow**: Check localStorage → Show modal if new
+- **Dynamic rendering**: Maps over all players, renders zones for each
+- **Turn rotation**: Cycles through all active players
+- **Layout**: 2x2 grid for up to 4 players
+
+### src/JoinModal.tsx
+- Blocks joining if room is full (4/4)
+- Shows current player count
+- Returns player name to App for UUID generation
+
+## Common Operations
+
+### Adding a New Helper Function
+1. Define in store.ts
+2. Export it
+3. Remember to log events if it's a user action
+4. Always spread existing state when updating: `{ ...card, newField: value }`
+
+### Adding New Card State
+1. Update `Card` interface in store.ts
+2. Update `addCard()` to initialize it
+3. Update `Card.tsx` to render it
+4. Use plain objects/arrays, NOT Maps or Sets
+
+### Debugging Sync Issues
+- Check browser console for WebRTC connection status
+- Verify all observers are attached in useEffect
+- Ensure cleanup (unobserve) happens on unmount
+- Check that you're not using ES6 Maps in card data
+
+## Multiplayer Flow
+
+1. User opens URL with hash: `http://localhost:5174/#room-name`
+2. App checks localStorage for existing player ID
+3. If new: Show JoinModal → Generate UUID → Call addPlayer()
+4. addPlayer() creates zones and sample cards automatically
+5. WebRTC syncs everything to all clients in same room
+6. Turn passing cycles through all players in join order
+
+## Important Constraints
+
+- **4 player max** - Enforced in `addPlayer()`
+- **Room namespacing** - Always prefix with `crdt-cards-`
+- **No ES6 Maps in CRDT** - Use plain objects `{}`
+- **Version bumping** - Increment `card.v` on every update
+- **Zone naming** - Format: `{type}-{playerId}` (e.g., "hand-abc123")
+
+## Future Considerations (Not Implemented Yet)
+
+- Drag & drop card movement
+- Card database / oracle integration
+- Deck building
+- Private zones (hidden from other players)
+- Undo/redo using event log
+- Custom game rules engines
+- Mobile responsive UI
+- Card art rendering
+- Authentication/persistent accounts
+
+## Testing Multiplayer
+
+Open multiple tabs with same URL hash:
+1. Tab 1: `http://localhost:5174/#test` - Join as Alice
+2. Tab 2: Same URL - Join as Bob
+3. Click "Next Turn" in either tab - both update
+4. Tap/untap cards - syncs instantly
+5. Close tab and reopen - Alice auto-recognized via localStorage
+
+## Troubleshooting
+
+**"Map serialization error"** → Check for `new Map()` in card data, use `{}` instead
+**Turn not updating** → Did you add `batonMap.observe(updateUI)`?
+**Cards not syncing** → Check WebRTC connection status (green dot in header)
+**Join modal loops** → Clear localStorage for that room
+**Room too full** → Max 4 players, older players must leave first
