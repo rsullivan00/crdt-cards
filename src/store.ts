@@ -1,11 +1,307 @@
 import * as Y from 'yjs'
 
-// Initialize the YJS document
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+export interface Player {
+  name: string
+}
+
+export interface Zone {
+  type: string // e.g., 'deck', 'hand', 'battlefield', 'graveyard', 'exile'
+  owner?: string // playerId, undefined for shared zones
+}
+
+export interface Card {
+  oracleId: string // external reference to card data/art
+  owner: string // playerId
+  zoneId: string
+  order: number // sortable key inside zone (supports stable deck order)
+  faceDown: boolean
+  tapped: boolean
+  counters: Map<string, number> // e.g., { '+1/+1': 3, 'loyalty': 4 }
+  attachments: string[] // array of cardIds (auras/equipment)
+  metadata: Map<string, any> // tokens, notes, etc.
+  v: number // version counter - bump this each move for concurrency resolution
+}
+
+export interface Baton {
+  playerId: string
+  step: string // e.g., 'untap', 'upkeep', 'draw', 'main1', 'combat', 'main2', 'end'
+}
+
+export interface GameEvent {
+  timestamp: number
+  playerId: string
+  action: string
+  data: any
+}
+
+// ============================================================================
+// YJS DOCUMENT SETUP
+// ============================================================================
+
 export const ydoc = new Y.Doc()
 
-// Example: Create a shared map for cards
-// This can be used later to store card data
-export const cardsMap = ydoc.getMap('cards')
+// Core game state maps
+export const playersMap = ydoc.getMap<Player>('players')
+export const zonesMap = ydoc.getMap<Zone>('zones')
+export const cardsMap = ydoc.getMap<Card>('cards')
 
-// Log when the document is initialized
+// Optional game state
+export const batonMap = ydoc.getMap<Baton>('baton') // Single entry for turn tracking
+export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle seed
+export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Add a new player to the game
+ */
+export function addPlayer(playerId: string, name: string): void {
+  playersMap.set(playerId, { name })
+  logEvent(playerId, 'player_joined', { name })
+}
+
+/**
+ * Remove a player from the game
+ */
+export function removePlayer(playerId: string): void {
+  const player = playersMap.get(playerId)
+  playersMap.delete(playerId)
+  if (player) {
+    logEvent(playerId, 'player_left', { name: player.name })
+  }
+}
+
+/**
+ * Create a new zone
+ */
+export function createZone(zoneId: string, type: string, owner?: string): void {
+  zonesMap.set(zoneId, { type, owner })
+}
+
+/**
+ * Add a card to the game
+ */
+export function addCard(
+  cardId: string,
+  oracleId: string,
+  owner: string,
+  zoneId: string,
+  order: number = 0
+): void {
+  cardsMap.set(cardId, {
+    oracleId,
+    owner,
+    zoneId,
+    order,
+    faceDown: false,
+    tapped: false,
+    counters: new Map(),
+    attachments: [],
+    metadata: new Map(),
+    v: 0,
+  })
+}
+
+/**
+ * Move a card to a new zone with optional new order
+ */
+export function moveCard(
+  cardId: string,
+  newZoneId: string,
+  newOrder?: number,
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const oldZoneId = card.zoneId
+
+  cardsMap.set(cardId, {
+    ...card,
+    zoneId: newZoneId,
+    order: newOrder ?? card.order,
+    v: card.v + 1, // Increment version for conflict resolution
+  })
+
+  if (playerId) {
+    logEvent(playerId, 'card_moved', {
+      cardId,
+      from: oldZoneId,
+      to: newZoneId,
+      order: newOrder,
+    })
+  }
+}
+
+/**
+ * Update card state (tap/untap, flip, etc.)
+ */
+export function updateCard(
+  cardId: string,
+  updates: Partial<Omit<Card, 'v'>>,
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  cardsMap.set(cardId, {
+    ...card,
+    ...updates,
+    v: card.v + 1,
+  })
+
+  if (playerId) {
+    logEvent(playerId, 'card_updated', { cardId, updates })
+  }
+}
+
+/**
+ * Tap or untap a card
+ */
+export function setCardTapped(cardId: string, tapped: boolean, playerId?: string): void {
+  updateCard(cardId, { tapped }, playerId)
+}
+
+/**
+ * Flip a card face up or face down
+ */
+export function setCardFaceDown(cardId: string, faceDown: boolean, playerId?: string): void {
+  updateCard(cardId, { faceDown }, playerId)
+}
+
+/**
+ * Add or remove counters from a card
+ */
+export function modifyCounters(
+  cardId: string,
+  counterType: string,
+  delta: number,
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const counters = new Map(card.counters)
+  const current = counters.get(counterType) ?? 0
+  const newValue = Math.max(0, current + delta)
+
+  if (newValue === 0) {
+    counters.delete(counterType)
+  } else {
+    counters.set(counterType, newValue)
+  }
+
+  updateCard(cardId, { counters }, playerId)
+}
+
+/**
+ * Attach a card to another card (auras, equipment)
+ */
+export function attachCard(cardId: string, targetCardId: string, playerId?: string): void {
+  const targetCard = cardsMap.get(targetCardId)
+  if (!targetCard) return
+
+  const attachments = [...targetCard.attachments, cardId]
+  updateCard(targetCardId, { attachments }, playerId)
+}
+
+/**
+ * Detach a card from another card
+ */
+export function detachCard(cardId: string, targetCardId: string, playerId?: string): void {
+  const targetCard = cardsMap.get(targetCardId)
+  if (!targetCard) return
+
+  const attachments = targetCard.attachments.filter((id) => id !== cardId)
+  updateCard(targetCardId, { attachments }, playerId)
+}
+
+/**
+ * Set the turn baton (current player and phase/step)
+ */
+export function setTurnBaton(playerId: string, step: string): void {
+  batonMap.set('current', { playerId, step })
+  logEvent(playerId, 'turn_changed', { step })
+}
+
+/**
+ * Get the current turn baton
+ */
+export function getTurnBaton(): Baton | undefined {
+  return batonMap.get('current')
+}
+
+/**
+ * Set the shuffle seed for deterministic randomness
+ */
+export function setShuffleSeed(seed: string): void {
+  seedMap.set('current', seed)
+}
+
+/**
+ * Get the current shuffle seed
+ */
+export function getShuffleSeed(): string | undefined {
+  return seedMap.get('current')
+}
+
+/**
+ * Log an event for audit/undo purposes
+ */
+export function logEvent(playerId: string, action: string, data: any): void {
+  logArray.push([{
+    timestamp: Date.now(),
+    playerId,
+    action,
+    data,
+  }])
+}
+
+/**
+ * Clear old log entries (optional housekeeping)
+ */
+export function pruneLog(keepCount: number = 100): void {
+  const length = logArray.length
+  if (length > keepCount) {
+    logArray.delete(0, length - keepCount)
+  }
+}
+
+/**
+ * Get all cards in a specific zone, sorted by order
+ */
+export function getCardsInZone(zoneId: string): Card[] {
+  const cards: Card[] = []
+  cardsMap.forEach((card) => {
+    if (card.zoneId === zoneId) {
+      cards.push(card)
+    }
+  })
+  return cards.sort((a, b) => a.order - b.order)
+}
+
+/**
+ * Get the next available order number for a zone
+ */
+export function getNextOrderInZone(zoneId: string): number {
+  const cards = getCardsInZone(zoneId)
+  if (cards.length === 0) return 0
+  return Math.max(...cards.map((c) => c.order)) + 1
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 console.log('YJS document initialized:', ydoc.guid)
+console.log('Game state maps ready:', {
+  players: playersMap.size,
+  zones: zonesMap.size,
+  cards: cardsMap.size,
+})
