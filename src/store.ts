@@ -54,6 +54,7 @@ export const cardsMap = ydoc.getMap<Card>('cards')
 export const batonMap = ydoc.getMap<Baton>('baton') // Single entry for turn tracking
 export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle seed
 export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
+export const counterTypesMap = ydoc.getMap<boolean>('counterTypes') // Track counter types used in this room
 
 // ============================================================================
 // HELPER FUNCTIONS

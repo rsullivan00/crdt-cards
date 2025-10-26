@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters } from './store'
+import { useState, useEffect } from 'react'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 
@@ -12,10 +12,37 @@ interface CardProps {
 
 export function Card({ card, cardId, playerColor, playerId }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
   const [counterModal, setCounterModal] = useState<{
     type: 'set' | 'add'
     counterType?: string
   } | null>(null)
+  const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
+
+  // Subscribe to counter types map
+  useEffect(() => {
+    const updateCounterTypes = () => {
+      const types: string[] = []
+      counterTypesMap.forEach((_, type) => {
+        types.push(type)
+      })
+      setKnownCounterTypes(types)
+    }
+
+    counterTypesMap.observe(updateCounterTypes)
+    updateCounterTypes()
+
+    return () => {
+      counterTypesMap.unobserve(updateCounterTypes)
+    }
+  }, [])
+
+  const handleAddCounterType = (counterType: string) => {
+    // Record this counter type in the room history
+    counterTypesMap.set(counterType, true)
+    // Add one counter of this type to the card
+    modifyCounters(cardId, counterType, 1, playerId)
+  }
 
   const cardStyle: React.CSSProperties = {
     width: '120px',
@@ -212,9 +239,19 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
             onClick={() => setShowMenu(false)}
           />
           <div style={menuStyle}>
+            {/* Move submenu header */}
             <div
-              style={menuItemStyle}
-              onClick={() => handleMove('hand')}
+              style={{
+                ...menuItemStyle,
+                fontWeight: 'bold',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMoveSubmenu(!showMoveSubmenu)
+              }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#f5f5f5'
               }}
@@ -222,68 +259,87 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
                 e.currentTarget.style.backgroundColor = 'white'
               }}
             >
-              → Hand
+              <span>Move to...</span>
+              <span>{showMoveSubmenu ? '▼' : '▶'}</span>
             </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => handleMove('battlefield')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
-              }}
-            >
-              → Battlefield
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => handleMove('graveyard')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
-              }}
-            >
-              → Graveyard
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => handleMove('exile')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
-              }}
-            >
-              → Exile
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => handleMove('deck', 'top')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
-              }}
-            >
-              → Deck (top)
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => handleMove('deck', 'bottom')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
-              }}
-            >
-              → Deck (bottom)
-            </div>
+
+            {/* Move submenu options */}
+            {showMoveSubmenu && (
+              <>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('hand')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Hand
+                </div>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('battlefield')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Battlefield
+                </div>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('graveyard')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Graveyard
+                </div>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('exile')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Exile
+                </div>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('deck', 'top')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Deck (top)
+                </div>
+                <div
+                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
+                  onClick={() => handleMove('deck', 'bottom')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  → Deck (bottom)
+                </div>
+              </>
+            )}
 
             {/* Counters Section */}
             <div
@@ -375,27 +431,112 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
               </div>
             ))}
 
-            {/* Add Counter Type button */}
+            {/* Quick Add Section */}
             <div
               style={{
-                ...menuItemStyle,
-                borderBottom: 'none',
-                color: '#4CAF50',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.7rem',
                 fontWeight: 'bold',
-              }}
-              onClick={(e) => {
-                e.stopPropagation()
-                setCounterModal({ type: 'add' })
-                setShowMenu(false)
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white'
+                color: '#666',
+                backgroundColor: '#f9f9f9',
+                borderBottom: '1px solid #eee',
               }}
             >
-              + Add Counter Type
+              QUICK ADD
+            </div>
+
+            <div
+              style={{
+                padding: '0.5rem 0.75rem',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '4px',
+                borderBottom: '1px solid #eee',
+              }}
+            >
+              {/* Always show +1/+1 and Loyalty */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAddCounterType('+1/+1')
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.7rem',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                +1/+1
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAddCounterType('Loyalty')
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.7rem',
+                  backgroundColor: '#9C27B0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Loyalty
+              </button>
+
+              {/* Show previously used counter types (excluding the presets) */}
+              {knownCounterTypes
+                .filter((type) => type !== '+1/+1' && type !== 'Loyalty')
+                .map((type) => (
+                  <button
+                    key={type}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleAddCounterType(type)
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.7rem',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {type}
+                  </button>
+                ))}
+
+              {/* Custom button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCounterModal({ type: 'add' })
+                  setShowMenu(false)
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.7rem',
+                  backgroundColor: '#757575',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                Custom...
+              </button>
             </div>
           </div>
         </>
