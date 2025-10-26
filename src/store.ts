@@ -135,14 +135,61 @@ function addSampleCardsForPlayer(playerId: string): void {
 }
 
 /**
- * Remove a player from the game
+ * Remove a player from the game completely (including zones and cards)
  */
 export function removePlayer(playerId: string): void {
   const player = playersMap.get(playerId)
+
+  // Remove player's zones
+  const zonesToRemove: string[] = []
+  zonesMap.forEach((zone, zoneId) => {
+    if (zone.owner === playerId) {
+      zonesToRemove.push(zoneId)
+    }
+  })
+  zonesToRemove.forEach(zoneId => zonesMap.delete(zoneId))
+
+  // Remove player's cards
+  const cardsToRemove: string[] = []
+  cardsMap.forEach((card, cardId) => {
+    if (card.owner === playerId) {
+      cardsToRemove.push(cardId)
+    }
+  })
+  cardsToRemove.forEach(cardId => cardsMap.delete(cardId))
+
+  // Remove player
   playersMap.delete(playerId)
-  if (player) {
-    logEvent(playerId, 'player_left', { name: player.name })
+
+  // If it was their turn, advance to next player
+  const baton = getTurnBaton()
+  if (baton && baton.playerId === playerId) {
+    const remainingPlayers = Array.from(playersMap.keys())
+    if (remainingPlayers.length > 0) {
+      setTurnBaton(remainingPlayers[0], 'main1')
+    } else {
+      batonMap.delete('current')
+    }
   }
+
+  if (player) {
+    logEvent(playerId, 'player_removed', { name: player.name })
+  }
+}
+
+/**
+ * Reset the entire room state (clears everything)
+ */
+export function resetRoom(): void {
+  // Clear all maps and arrays
+  playersMap.clear()
+  zonesMap.clear()
+  cardsMap.clear()
+  batonMap.clear()
+  seedMap.clear()
+  logArray.delete(0, logArray.length)
+
+  console.log('Room reset - all state cleared')
 }
 
 /**

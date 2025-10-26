@@ -6,6 +6,8 @@ import {
   cardsMap,
   batonMap,
   addPlayer,
+  removePlayer,
+  resetRoom,
   moveCard,
   setCardTapped,
   getTurnBaton,
@@ -19,6 +21,7 @@ import {
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
+import { ConfirmDialog } from './ConfirmDialog'
 
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
@@ -26,6 +29,10 @@ function App() {
   const [currentTurn, setCurrentTurn] = useState<string>('')
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string
+    onConfirm: () => void
+  } | null>(null)
   const [, forceUpdate] = useState({})
 
   useEffect(() => {
@@ -116,6 +123,41 @@ function App() {
     }
   }
 
+  const handleRemovePlayer = (playerId: string, playerName: string) => {
+    setConfirmDialog({
+      message: `Remove ${playerName} from the game? This will delete their zones and cards.`,
+      onConfirm: () => {
+        removePlayer(playerId)
+
+        // If removing yourself, clear localStorage and rejoin
+        if (playerId === currentPlayerId) {
+          const storageKey = `crdt-cards-player-${getRoomName()}`
+          localStorage.removeItem(storageKey)
+          setCurrentPlayerId(null)
+          setShowJoinModal(true)
+        }
+
+        setConfirmDialog(null)
+      },
+    })
+  }
+
+  const handleResetRoom = () => {
+    setConfirmDialog({
+      message: 'Reset the entire room? This will clear all players, cards, and game state. This cannot be undone.',
+      onConfirm: () => {
+        resetRoom()
+
+        // Clear localStorage for this room
+        const storageKey = `crdt-cards-player-${getRoomName()}`
+        localStorage.removeItem(storageKey)
+
+        // Reload page to fresh state
+        window.location.reload()
+      },
+    })
+  }
+
   // Get cards for a specific zone
   const getZoneCards = (zoneId: string): Array<{ id: string; card: CardType }> => {
     const cards: Array<{ id: string; card: CardType }> = []
@@ -184,7 +226,7 @@ function App() {
               </>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.875rem', flexWrap: 'wrap' }}>
             <div>
               <strong>Room:</strong> {getRoomName().replace('crdt-cards-', '')}
             </div>
@@ -206,6 +248,27 @@ function App() {
               />
               {connected && synced ? 'Connected' : connected ? 'Syncing...' : 'Connecting...'}
             </div>
+            <button
+              onClick={handleResetRoom}
+              style={{
+                padding: '0.25rem 0.75rem',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                color: 'white',
+                backgroundColor: '#F44336',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#d32f2f'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#F44336'
+              }}
+            >
+              Reset Room
+            </button>
           </div>
         </div>
       </div>
@@ -254,8 +317,32 @@ function App() {
                 gap: '0.5rem',
               }}
             >
-              {player.name}
-              {id === currentPlayerId && ' (You)'}
+              <span>
+                {player.name}
+                {id === currentPlayerId && ' (You)'}
+              </span>
+              <button
+                onClick={() => handleRemovePlayer(id, player.name)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  lineHeight: 1,
+                  padding: '0 0.25rem',
+                  opacity: 0.7,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.7'
+                }}
+                title={`Remove ${player.name}`}
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
@@ -326,6 +413,14 @@ function App() {
           <br />
           Share this URL with friends: <code style={{ backgroundColor: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{window.location.href}</code>
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   )
