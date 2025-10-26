@@ -92,6 +92,7 @@ export function addPlayer(playerId: string, name: string): void {
   createZone(`hand-${playerId}`, 'hand', playerId)
   createZone(`battlefield-${playerId}`, 'battlefield', playerId)
   createZone(`graveyard-${playerId}`, 'graveyard', playerId)
+  createZone(`exile-${playerId}`, 'exile', playerId)
 
   // Add sample cards
   addSampleCardsForPlayer(playerId)
@@ -103,19 +104,24 @@ export function addPlayer(playerId: string, name: string): void {
  * Add sample cards for a new player
  */
 function addSampleCardsForPlayer(playerId: string): void {
-  const sampleCards = [
+  const sampleCardNames = [
     'Lightning Bolt',
     'Giant Growth',
     'Counterspell',
     'Swords to Plowshares',
     'Dark Ritual',
+    'Path to Exile',
+    'Brainstorm',
+    'Llanowar Elves',
+    'Doom Blade',
+    'Cancel',
   ]
 
   // Add 3 cards to hand
   for (let i = 0; i < 3; i++) {
     addCard(
-      `${playerId}-card-${i}`,
-      sampleCards[i],
+      `${playerId}-card-hand-${i}`,
+      sampleCardNames[i % sampleCardNames.length],
       playerId,
       `hand-${playerId}`,
       i
@@ -123,13 +129,24 @@ function addSampleCardsForPlayer(playerId: string): void {
   }
 
   // Add 2 cards to battlefield
-  for (let i = 3; i < 5; i++) {
+  for (let i = 0; i < 2; i++) {
     addCard(
-      `${playerId}-card-${i}`,
-      sampleCards[i],
+      `${playerId}-card-battlefield-${i}`,
+      sampleCardNames[(i + 3) % sampleCardNames.length],
       playerId,
       `battlefield-${playerId}`,
-      i - 3
+      i
+    )
+  }
+
+  // Add 50 cards to deck
+  for (let i = 0; i < 50; i++) {
+    addCard(
+      `${playerId}-card-deck-${i}`,
+      sampleCardNames[i % sampleCardNames.length],
+      playerId,
+      `deck-${playerId}`,
+      i
     )
   }
 }
@@ -408,6 +425,158 @@ export function getNextOrderInZone(zoneId: string): number {
   const cards = getCardsInZone(zoneId)
   if (cards.length === 0) return 0
   return Math.max(...cards.map((c) => c.order)) + 1
+}
+
+/**
+ * Draw cards from deck to hand
+ */
+export function drawCards(playerId: string, count: number): void {
+  const deckZoneId = `deck-${playerId}`
+  const handZoneId = `hand-${playerId}`
+
+  const deckCards = getCardsInZone(deckZoneId)
+  const actualCount = Math.min(count, deckCards.length)
+
+  if (actualCount === 0) return
+
+  const nextHandOrder = getNextOrderInZone(handZoneId)
+
+  // Move top N cards from deck to hand
+  for (let i = 0; i < actualCount; i++) {
+    const card = deckCards[i]
+    const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
+    if (cardId) {
+      moveCard(cardId, handZoneId, nextHandOrder + i, playerId)
+    }
+  }
+
+  logEvent(playerId, 'draw_cards', { count: actualCount })
+}
+
+/**
+ * Mill cards from deck to graveyard
+ */
+export function millCards(playerId: string, count: number): void {
+  const deckZoneId = `deck-${playerId}`
+  const graveyardZoneId = `graveyard-${playerId}`
+
+  const deckCards = getCardsInZone(deckZoneId)
+  const actualCount = Math.min(count, deckCards.length)
+
+  if (actualCount === 0) return
+
+  const nextGraveyardOrder = getNextOrderInZone(graveyardZoneId)
+
+  // Move top N cards from deck to graveyard
+  for (let i = 0; i < actualCount; i++) {
+    const card = deckCards[i]
+    const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
+    if (cardId) {
+      moveCard(cardId, graveyardZoneId, nextGraveyardOrder + i, playerId)
+    }
+  }
+
+  logEvent(playerId, 'mill_cards', { count: actualCount })
+}
+
+/**
+ * Exile cards from top of deck
+ */
+export function exileFromDeck(playerId: string, count: number): void {
+  const deckZoneId = `deck-${playerId}`
+  const exileZoneId = `exile-${playerId}`
+
+  const deckCards = getCardsInZone(deckZoneId)
+  const actualCount = Math.min(count, deckCards.length)
+
+  if (actualCount === 0) return
+
+  const nextExileOrder = getNextOrderInZone(exileZoneId)
+
+  // Move top N cards from deck to exile
+  for (let i = 0; i < actualCount; i++) {
+    const card = deckCards[i]
+    const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
+    if (cardId) {
+      moveCard(cardId, exileZoneId, nextExileOrder + i, playerId)
+    }
+  }
+
+  logEvent(playerId, 'exile_from_deck', { count: actualCount })
+}
+
+/**
+ * Shuffle a player's deck
+ */
+export function shuffleDeck(playerId: string): void {
+  const deckZoneId = `deck-${playerId}`
+  const deckCards = getCardsInZone(deckZoneId)
+
+  if (deckCards.length === 0) return
+
+  // Get card IDs
+  const cardIds: string[] = []
+  cardsMap.forEach((card, cardId) => {
+    if (card.zoneId === deckZoneId) {
+      cardIds.push(cardId)
+    }
+  })
+
+  // Shuffle using Fisher-Yates algorithm
+  const shuffled = [...cardIds]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  // Reassign order values
+  shuffled.forEach((cardId, index) => {
+    const card = cardsMap.get(cardId)
+    if (card) {
+      cardsMap.set(cardId, {
+        ...card,
+        order: index,
+        v: card.v + 1,
+      })
+    }
+  })
+
+  logEvent(playerId, 'shuffle_deck', { cardCount: shuffled.length })
+}
+
+/**
+ * Move a card to a specific zone with position (top/bottom for deck)
+ */
+export function moveCardToZone(
+  cardId: string,
+  targetZoneId: string,
+  position: 'top' | 'bottom' | 'auto' = 'auto',
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  let newOrder: number
+
+  if (position === 'top') {
+    // Insert at beginning (order 0, shift others up)
+    const zoneCards = getCardsInZone(targetZoneId)
+    zoneCards.forEach(c => {
+      const cId = Array.from(cardsMap.entries()).find(([_, card]) => card === c)?.[0]
+      if (cId) {
+        cardsMap.set(cId, { ...c, order: c.order + 1, v: c.v + 1 })
+      }
+    })
+    newOrder = 0
+  } else if (position === 'bottom') {
+    // Insert at end
+    newOrder = getNextOrderInZone(targetZoneId)
+  } else {
+    // Auto: append to end
+    newOrder = getNextOrderInZone(targetZoneId)
+  }
+
+  moveCard(cardId, targetZoneId, newOrder, playerId)
 }
 
 // ============================================================================

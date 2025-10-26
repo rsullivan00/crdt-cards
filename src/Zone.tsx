@@ -1,14 +1,223 @@
+import { useState } from 'react'
 import { Card as CardComponent } from './Card'
 import { Card as CardType } from './store'
+import { NumberInputModal } from './NumberInputModal'
 
 interface ZoneProps {
   zoneName: string
   zoneType: string
   cards: Array<{ id: string; card: CardType }>
   playerColor: string
+  playerId: string
+  onDrawCards?: (count: number) => void
+  onMillCards?: (count: number) => void
+  onExileFromDeck?: (count: number) => void
+  onShuffleDeck?: () => void
 }
 
-export function Zone({ zoneName, zoneType, cards, playerColor }: ZoneProps) {
+export function Zone({
+  zoneName,
+  zoneType,
+  cards,
+  playerColor,
+  playerId,
+  onDrawCards,
+  onMillCards,
+  onExileFromDeck,
+  onShuffleDeck,
+}: ZoneProps) {
+  const [numberModal, setNumberModal] = useState<{
+    title: string
+    onConfirm: (value: number) => void
+  } | null>(null)
+
+  // Deck zone gets special rendering
+  if (zoneType === 'deck') {
+    return (
+      <div
+        style={{
+          backgroundColor: '#f5f5f5',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
+            {zoneName}
+          </h3>
+          <span
+            style={{
+              backgroundColor: playerColor,
+              color: 'white',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+            }}
+          >
+            {cards.length} cards
+          </span>
+        </div>
+
+        {/* Deck visual representation */}
+        <div
+          style={{
+            backgroundColor: '#333',
+            border: '2px solid #666',
+            borderRadius: '8px',
+            padding: '2rem 1rem',
+            textAlign: 'center',
+            color: 'white',
+            marginBottom: '0.75rem',
+            fontSize: '2rem',
+          }}
+        >
+          🃏
+        </div>
+
+        {/* Deck actions */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}
+        >
+          <button
+            onClick={() => onDrawCards?.(1)}
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#4CAF50' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Draw 1
+          </button>
+          <button
+            onClick={() =>
+              setNumberModal({
+                title: 'Draw how many cards?',
+                onConfirm: (n) => {
+                  onDrawCards?.(n)
+                  setNumberModal(null)
+                },
+              })
+            }
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#4CAF50' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Draw N
+          </button>
+          <button
+            onClick={() => onMillCards?.(1)}
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#FF9800' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Mill 1
+          </button>
+          <button
+            onClick={() =>
+              setNumberModal({
+                title: 'Mill how many cards?',
+                onConfirm: (n) => {
+                  onMillCards?.(n)
+                  setNumberModal(null)
+                },
+              })
+            }
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#FF9800' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Mill N
+          </button>
+          <button
+            onClick={() => onExileFromDeck?.(1)}
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#9C27B0' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Exile 1
+          </button>
+          <button
+            onClick={() => onShuffleDeck?.()}
+            disabled={cards.length === 0}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cards.length > 0 ? '#2196F3' : '#ccc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: cards.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Shuffle
+          </button>
+        </div>
+
+        {numberModal && (
+          <NumberInputModal
+            title={numberModal.title}
+            max={cards.length}
+            onConfirm={numberModal.onConfirm}
+            onCancel={() => setNumberModal(null)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // Regular zones (hand, battlefield, graveyard, exile)
   return (
     <div
       style={{
@@ -28,7 +237,7 @@ export function Zone({ zoneName, zoneType, cards, playerColor }: ZoneProps) {
         }}
       >
         <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
-          {zoneName} ({zoneType})
+          {zoneName}
         </h3>
         <span
           style={{
@@ -66,7 +275,13 @@ export function Zone({ zoneName, zoneType, cards, playerColor }: ZoneProps) {
           </div>
         ) : (
           cards.map(({ id, card }) => (
-            <CardComponent key={id} cardId={id} card={card} playerColor={playerColor} />
+            <CardComponent
+              key={id}
+              cardId={id}
+              card={card}
+              playerColor={playerColor}
+              playerId={playerId}
+            />
           ))
         )}
       </div>

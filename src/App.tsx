@@ -8,6 +8,10 @@ import {
   addPlayer,
   removePlayer,
   resetRoom,
+  drawCards,
+  millCards,
+  exileFromDeck,
+  shuffleDeck,
   moveCard,
   setCardTapped,
   getTurnBaton,
@@ -388,6 +392,11 @@ function App() {
                   zoneType={zone.type}
                   cards={getZoneCards(zoneId)}
                   playerColor={playerColor}
+                  playerId={id}
+                  onDrawCards={zone.type === 'deck' ? (count) => drawCards(id, count) : undefined}
+                  onMillCards={zone.type === 'deck' ? (count) => millCards(id, count) : undefined}
+                  onExileFromDeck={zone.type === 'deck' ? (count) => exileFromDeck(id, count) : undefined}
+                  onShuffleDeck={zone.type === 'deck' ? () => shuffleDeck(id) : undefined}
                 />
               ))}
             </div>
