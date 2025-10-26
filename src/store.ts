@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import { WebrtcProvider } from 'y-webrtc'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -20,9 +21,9 @@ export interface Card {
   order: number // sortable key inside zone (supports stable deck order)
   faceDown: boolean
   tapped: boolean
-  counters: Map<string, number> // e.g., { '+1/+1': 3, 'loyalty': 4 }
+  counters: { [key: string]: number } // e.g., { '+1/+1': 3, 'loyalty': 4 }
   attachments: string[] // array of cardIds (auras/equipment)
-  metadata: Map<string, any> // tokens, notes, etc.
+  metadata: { [key: string]: any } // tokens, notes, etc.
   v: number // version counter - bump this each move for concurrency resolution
 }
 
@@ -101,9 +102,9 @@ export function addCard(
     order,
     faceDown: false,
     tapped: false,
-    counters: new Map(),
+    counters: {},
     attachments: [],
-    metadata: new Map(),
+    metadata: {},
     v: 0,
   })
 }
@@ -187,14 +188,14 @@ export function modifyCounters(
   const card = cardsMap.get(cardId)
   if (!card) return
 
-  const counters = new Map(card.counters)
-  const current = counters.get(counterType) ?? 0
+  const counters = { ...card.counters }
+  const current = counters[counterType] ?? 0
   const newValue = Math.max(0, current + delta)
 
   if (newValue === 0) {
-    counters.delete(counterType)
+    delete counters[counterType]
   } else {
-    counters.set(counterType, newValue)
+    counters[counterType] = newValue
   }
 
   updateCard(cardId, { counters }, playerId)
@@ -296,10 +297,50 @@ export function getNextOrderInZone(zoneId: string): number {
 }
 
 // ============================================================================
+// WEBRTC PROVIDER FOR REAL-TIME SYNC
+// ============================================================================
+
+/**
+ * Get the room name from URL hash or use default
+ */
+export function getRoomName(): string {
+  const hash = window.location.hash.slice(1) // Remove '#'
+  const roomId = hash || 'default'
+  return `crdt-cards-${roomId}`
+}
+
+/**
+ * WebRTC provider for peer-to-peer synchronization
+ */
+export const provider = new WebrtcProvider(getRoomName(), ydoc, {
+  signaling: [
+    'wss://signaling.yjs.dev',
+    'wss://y-webrtc-signaling-eu.herokuapp.com',
+    'wss://y-webrtc-signaling-us.herokuapp.com',
+  ],
+})
+
+// Log connection status
+provider.on('status', (event: { connected: boolean }) => {
+  console.log('WebRTC status:', event.connected ? 'connected' : 'disconnected')
+})
+
+provider.on('synced', (event: { synced: boolean }) => {
+  console.log('YJS synced:', event.synced)
+})
+
+// Listen for URL hash changes (room switching)
+window.addEventListener('hashchange', () => {
+  console.log('Room changed, reloading to connect to new room...')
+  window.location.reload()
+})
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 console.log('YJS document initialized:', ydoc.guid)
+console.log('Room name:', getRoomName())
 console.log('Game state maps ready:', {
   players: playersMap.size,
   zones: zonesMap.size,

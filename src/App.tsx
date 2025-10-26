@@ -13,12 +13,16 @@ import {
   setTurnBaton,
   Card as CardType,
   Zone as ZoneType,
+  provider,
+  getRoomName,
 } from './store'
 import { Zone } from './Zone'
 
 function App() {
   const [initialized, setInitialized] = useState(false)
   const [currentTurn, setCurrentTurn] = useState<string>('')
+  const [connected, setConnected] = useState(false)
+  const [synced, setSynced] = useState(false)
   const [, forceUpdate] = useState({})
 
   // Player colors
@@ -75,6 +79,18 @@ function App() {
 
     initGame()
 
+    // Subscribe to WebRTC connection status
+    const handleStatus = (event: { connected: boolean }) => {
+      setConnected(event.connected)
+    }
+
+    const handleSynced = (event: { synced: boolean }) => {
+      setSynced(event.synced)
+    }
+
+    provider.on('status', handleStatus)
+    provider.on('synced', handleSynced)
+
     // Subscribe to changes
     const updateUI = () => {
       const baton = getTurnBaton()
@@ -96,6 +112,8 @@ function App() {
       playersMap.unobserve(updateUI)
       zonesMap.unobserve(updateUI)
       cardsMap.unobserve(updateUI)
+      provider.off('status', handleStatus)
+      provider.off('synced', handleSynced)
     }
   }, [])
 
@@ -169,12 +187,32 @@ function App() {
         }}
       >
         <h1 style={{ margin: '0 0 0.5rem 0' }}>CRDT Cards</h1>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <strong>Current Turn:</strong> {currentTurn}
           </div>
-          <div style={{ fontSize: '0.875rem', color: '#666' }}>
-            Doc: {ydoc.guid.slice(0, 8)}...
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.875rem' }}>
+            <div>
+              <strong>Room:</strong> {getRoomName().replace('crdt-cards-', '')}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                color: connected && synced ? '#4CAF50' : '#FF9800',
+              }}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: connected && synced ? '#4CAF50' : '#FF9800',
+                }}
+              />
+              {connected && synced ? 'Connected' : connected ? 'Syncing...' : 'Connecting...'}
+            </div>
           </div>
         </div>
       </div>

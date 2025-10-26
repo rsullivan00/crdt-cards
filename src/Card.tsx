@@ -62,7 +62,7 @@ export function Card({ card, cardId, playerColor }: CardProps) {
     fontWeight: 'bold',
   }
 
-  const totalCounters = Array.from(card.counters.values()).reduce((sum, count) => sum + count, 0)
+  const totalCounters = Object.values(card.counters).reduce((sum: number, count: number) => sum + count, 0)
 
   if (card.faceDown) {
     return (
