@@ -13,6 +13,8 @@ interface ZoneProps {
   onMillCards?: (count: number) => void
   onExileFromDeck?: (count: number) => void
   onShuffleDeck?: () => void
+  isInteractive?: boolean
+  viewerPlayerId?: string
 }
 
 export function Zone({
@@ -25,6 +27,8 @@ export function Zone({
   onMillCards,
   onExileFromDeck,
   onShuffleDeck,
+  isInteractive = true,
+  viewerPlayerId,
 }: ZoneProps) {
   const [numberModal, setNumberModal] = useState<{
     title: string
@@ -274,15 +278,25 @@ export function Zone({
             No cards in this zone
           </div>
         ) : (
-          cards.map(({ id, card }) => (
-            <CardComponent
-              key={id}
-              cardId={id}
-              card={card}
-              playerColor={playerColor}
-              playerId={playerId}
-            />
-          ))
+          cards.map(({ id, card }) => {
+            // Hide opponent's hand cards
+            const shouldHideCard =
+              zoneType === 'hand' &&
+              !!viewerPlayerId &&
+              playerId !== viewerPlayerId
+
+            return (
+              <CardComponent
+                key={id}
+                cardId={id}
+                card={card}
+                playerColor={playerColor}
+                playerId={playerId}
+                isInteractive={isInteractive}
+                forceFaceDown={shouldHideCard}
+              />
+            )
+          })
         )}
       </div>
     </div>

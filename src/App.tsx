@@ -27,6 +27,8 @@ import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
 
+type ViewMode = 'focused' | 'grid'
+
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
   const [showJoinModal, setShowJoinModal] = useState(false)
@@ -39,6 +41,10 @@ function App() {
   } | null>(null)
   const [, forceUpdate] = useState({})
 
+  // New layout state
+  const [viewMode, setViewMode] = useState<ViewMode>('focused')
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+
   useEffect(() => {
     // Check if player already joined this room
     const storageKey = `crdt-cards-player-${getRoomName()}`
@@ -47,9 +53,16 @@ function App() {
     if (savedPlayerId && playersMap.has(savedPlayerId)) {
       // Player already exists in this room
       setCurrentPlayerId(savedPlayerId)
+      setSelectedPlayerId(savedPlayerId) // Default to viewing own board
     } else {
       // New player needs to join
       setShowJoinModal(true)
+    }
+
+    // Load view preferences
+    const savedViewMode = localStorage.getItem(`crdt-cards-viewmode-${getRoomName()}`)
+    if (savedViewMode === 'grid' || savedViewMode === 'focused') {
+      setViewMode(savedViewMode)
     }
 
     // Subscribe to WebRTC connection status
@@ -64,6 +77,7 @@ function App() {
         // Player was removed, show join modal again
         localStorage.removeItem(storageKey)
         setCurrentPlayerId(null)
+        setSelectedPlayerId(null)
         setShowJoinModal(true)
       }
     }
@@ -108,6 +122,7 @@ function App() {
     localStorage.setItem(storageKey, playerId)
 
     setCurrentPlayerId(playerId)
+    setSelectedPlayerId(playerId)
     setShowJoinModal(false)
 
     // Set initial turn to first player if not set
@@ -138,7 +153,13 @@ function App() {
           const storageKey = `crdt-cards-player-${getRoomName()}`
           localStorage.removeItem(storageKey)
           setCurrentPlayerId(null)
+          setSelectedPlayerId(null)
           setShowJoinModal(true)
+        }
+
+        // If viewing removed player, switch to current player
+        if (playerId === selectedPlayerId && currentPlayerId) {
+          setSelectedPlayerId(currentPlayerId)
         }
 
         setConfirmDialog(null)
@@ -160,6 +181,12 @@ function App() {
         window.location.reload()
       },
     })
+  }
+
+  const toggleViewMode = () => {
+    const newMode: ViewMode = viewMode === 'focused' ? 'grid' : 'focused'
+    setViewMode(newMode)
+    localStorage.setItem(`crdt-cards-viewmode-${getRoomName()}`, newMode)
   }
 
   // Get cards for a specific zone
@@ -199,14 +226,16 @@ function App() {
   }
 
   const currentPlayer = playersMap.get(currentPlayerId)
+  const viewedPlayerId = selectedPlayerId || currentPlayerId
 
   return (
     <div
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        padding: '1rem',
         backgroundColor: '#e0e0e0',
         minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Header */}
@@ -214,32 +243,61 @@ function App() {
         style={{
           backgroundColor: '#fff',
           padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
         }}
       >
-        <h1 style={{ margin: '0 0 0.5rem 0' }}>CRDT Cards</h1>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <strong>You:</strong> {currentPlayer?.name || 'Unknown'}
-            {currentTurn && (
-              <>
-                {' | '}
-                <strong>Turn:</strong> {currentTurn}
-              </>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.875rem', flexWrap: 'wrap' }}>
-            <div>
-              <strong>Room:</strong> {getRoomName().replace('crdt-cards-', '')}
+            <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem' }}>CRDT Cards</h1>
+            <div style={{ fontSize: '0.875rem' }}>
+              <strong>You:</strong> {currentPlayer?.name || 'Unknown'}
+              {currentTurn && (
+                <>
+                  {' | '}
+                  <strong>Turn:</strong> {currentTurn}
+                </>
+              )}
             </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={toggleViewMode}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: 'bold',
+                backgroundColor: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              {viewMode === 'focused' ? '⊞ Grid View' : '⊡ Focused View'}
+            </button>
+            <button
+              onClick={handleNextTurn}
+              disabled={players.length === 0}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: 'bold',
+                backgroundColor: players.length > 0 ? '#9C27B0' : '#ccc',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: players.length > 0 ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Next Turn
+            </button>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.25rem',
                 color: connected && synced ? '#4CAF50' : '#FF9800',
+                fontSize: '0.75rem',
               }}
             >
               <span
@@ -255,7 +313,7 @@ function App() {
             <button
               onClick={handleResetRoom}
               style={{
-                padding: '0.25rem 0.75rem',
+                padding: '0.5rem 0.75rem',
                 fontSize: '0.75rem',
                 fontWeight: 'bold',
                 color: 'white',
@@ -264,12 +322,6 @@ function App() {
                 borderRadius: '4px',
                 cursor: 'pointer',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#d32f2f'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#F44336'
-              }}
             >
               Reset Room
             </button>
@@ -277,142 +329,248 @@ function App() {
         </div>
       </div>
 
-      {/* Players List */}
-      <div
-        style={{
-          backgroundColor: '#fff',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <h3 style={{ margin: 0 }}>Players ({players.length}/4)</h3>
-          <button
-            onClick={handleNextTurn}
-            disabled={players.length === 0}
+      {/* Main Content */}
+      {viewMode === 'focused' ? (
+        // Focused Mode Layout
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Player Rail */}
+          <div
             style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: players.length > 0 ? '#9C27B0' : '#ccc',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: players.length > 0 ? 'pointer' : 'not-allowed',
-              fontWeight: 'bold',
+              width: '200px',
+              backgroundColor: '#fff',
+              boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+              padding: '1rem',
+              overflowY: 'auto',
             }}
           >
-            Next Turn
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {players.map(({ id, player }) => (
-            <div
-              key={id}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: getPlayerColor(id),
-                color: 'white',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                fontSize: '0.875rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              <span>
-                {player.name}
-                {id === currentPlayerId && ' (You)'}
-              </span>
-              <button
-                onClick={() => handleRemovePlayer(id, player.name)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  lineHeight: 1,
-                  padding: '0 0.25rem',
-                  opacity: 0.7,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '1'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '0.7'
-                }}
-                title={`Remove ${player.name}`}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Game Board - 2x2 Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: players.length === 1 ? '1fr' : '1fr 1fr',
-          gap: '1rem',
-        }}
-      >
-        {players.map(({ id, player }) => {
-          const zones = getPlayerZones(id)
-          const playerColor = getPlayerColor(id)
-
-          return (
-            <div
-              key={id}
-              style={{
-                backgroundColor: '#fff',
-                padding: '1rem',
-                borderRadius: '8px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              }}
-            >
-              <h2
-                style={{
-                  margin: '0 0 1rem 0',
-                  color: playerColor,
-                  borderBottom: `3px solid ${playerColor}`,
-                  paddingBottom: '0.5rem',
-                }}
-              >
-                {player.name}
-                {id === currentPlayerId && ' (You)'}
-              </h2>
-              {zones.map(({ id: zoneId, zone }) => (
-                <Zone
-                  key={zoneId}
-                  zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
-                  zoneType={zone.type}
-                  cards={getZoneCards(zoneId)}
-                  playerColor={playerColor}
-                  playerId={id}
-                  onDrawCards={zone.type === 'deck' ? (count) => drawCards(id, count) : undefined}
-                  onMillCards={zone.type === 'deck' ? (count) => millCards(id, count) : undefined}
-                  onExileFromDeck={zone.type === 'deck' ? (count) => exileFromDeck(id, count) : undefined}
-                  onShuffleDeck={zone.type === 'deck' ? () => shuffleDeck(id) : undefined}
-                />
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: '#666' }}>
+              PLAYERS ({players.length}/4)
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {players.map(({ id, player }) => (
+                <div
+                  key={id}
+                  onClick={() => setSelectedPlayerId(id)}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: id === viewedPlayerId ? getPlayerColor(id) : '#f5f5f5',
+                    color: id === viewedPlayerId ? 'white' : '#333',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: id === viewedPlayerId ? 'bold' : 'normal',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (id !== viewedPlayerId) {
+                      e.currentTarget.style.backgroundColor = '#e0e0e0'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (id !== viewedPlayerId) {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }
+                  }}
+                >
+                  <span>
+                    {player.name}
+                    {id === currentPlayerId && ' (You)'}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemovePlayer(id, player.name)
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: id === viewedPlayerId ? 'white' : '#666',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem',
+                      lineHeight: 1,
+                      padding: '0 0.25rem',
+                      opacity: 0.7,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0.7'
+                    }}
+                    title={`Remove ${player.name}`}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
-          )
-        })}
-      </div>
+            {currentPlayerId !== viewedPlayerId && (
+              <button
+                onClick={() => setSelectedPlayerId(currentPlayerId)}
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.5rem',
+                  width: '100%',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                ← My Board
+              </button>
+            )}
+          </div>
+
+          {/* Main Stage */}
+          <div style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
+            {players.find(p => p.id === viewedPlayerId) && (
+              <div
+                style={{
+                  backgroundColor: '#fff',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                }}
+              >
+                <h2
+                  style={{
+                    margin: '0 0 1rem 0',
+                    color: getPlayerColor(viewedPlayerId),
+                    borderBottom: `3px solid ${getPlayerColor(viewedPlayerId)}`,
+                    paddingBottom: '0.5rem',
+                  }}
+                >
+                  {playersMap.get(viewedPlayerId)?.name || 'Unknown'}
+                  {viewedPlayerId === currentPlayerId && ' (You)'}
+                </h2>
+                {getPlayerZones(viewedPlayerId).map(({ id: zoneId, zone }) => (
+                  <Zone
+                    key={zoneId}
+                    zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
+                    zoneType={zone.type}
+                    cards={getZoneCards(zoneId)}
+                    playerColor={getPlayerColor(viewedPlayerId)}
+                    playerId={viewedPlayerId}
+                    onDrawCards={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => drawCards(viewedPlayerId, count) : undefined}
+                    onMillCards={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => millCards(viewedPlayerId, count) : undefined}
+                    onExileFromDeck={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => exileFromDeck(viewedPlayerId, count) : undefined}
+                    onShuffleDeck={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? () => shuffleDeck(viewedPlayerId) : undefined}
+                    isInteractive={viewedPlayerId === currentPlayerId}
+                    viewerPlayerId={currentPlayerId}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        // Grid Mode Layout
+        <div style={{ flex: 1, padding: '1rem', overflow: 'auto' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: players.length === 1 ? '1fr' : players.length === 2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)',
+              gridTemplateRows: players.length <= 2 ? '1fr' : 'repeat(2, 1fr)',
+              gap: '1rem',
+              height: players.length <= 2 ? '100%' : 'calc(100vh - 150px)',
+            }}
+          >
+            {players.map(({ id, player }) => {
+              const zones = getPlayerZones(id)
+              const playerColor = getPlayerColor(id)
+              const isCurrentPlayer = id === currentPlayerId
+
+              return (
+                <div
+                  key={id}
+                  style={{
+                    backgroundColor: '#fff',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    overflow: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <h2
+                    style={{
+                      margin: '0 0 1rem 0',
+                      color: playerColor,
+                      borderBottom: `3px solid ${playerColor}`,
+                      paddingBottom: '0.5rem',
+                      fontSize: '1.25rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>
+                      {player.name}
+                      {id === currentPlayerId && ' (You)'}
+                    </span>
+                    <button
+                      onClick={() => handleRemovePlayer(id, player.name)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: playerColor,
+                        cursor: 'pointer',
+                        fontSize: '1.2rem',
+                        lineHeight: 1,
+                        padding: '0 0.25rem',
+                        opacity: 0.7,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '1'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '0.7'
+                      }}
+                      title={`Remove ${player.name}`}
+                    >
+                      ×
+                    </button>
+                  </h2>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    {zones.map(({ id: zoneId, zone }) => (
+                      <Zone
+                        key={zoneId}
+                        zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
+                        zoneType={zone.type}
+                        cards={getZoneCards(zoneId)}
+                        playerColor={playerColor}
+                        playerId={id}
+                        onDrawCards={zone.type === 'deck' && isCurrentPlayer ? (count) => drawCards(id, count) : undefined}
+                        onMillCards={zone.type === 'deck' && isCurrentPlayer ? (count) => millCards(id, count) : undefined}
+                        onExileFromDeck={zone.type === 'deck' && isCurrentPlayer ? (count) => exileFromDeck(id, count) : undefined}
+                        onShuffleDeck={zone.type === 'deck' && isCurrentPlayer ? () => shuffleDeck(id) : undefined}
+                        isInteractive={isCurrentPlayer}
+                        viewerPlayerId={currentPlayerId}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Info Footer */}
       {players.length < 4 && (
         <div
           style={{
-            marginTop: '1rem',
             padding: '1rem',
             backgroundColor: '#fff',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',
             fontSize: '0.875rem',
             color: '#666',
             textAlign: 'center',
@@ -420,7 +578,7 @@ function App() {
         >
           <strong>💡 Waiting for players...</strong>
           <br />
-          Share this URL with friends: <code style={{ backgroundColor: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{window.location.href}</code>
+          Share this URL: <code style={{ backgroundColor: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{window.location.href}</code>
         </div>
       )}
 

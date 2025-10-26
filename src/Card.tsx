@@ -8,9 +8,18 @@ interface CardProps {
   cardId: string
   playerColor: string
   playerId: string
+  isInteractive?: boolean
+  forceFaceDown?: boolean
 }
 
-export function Card({ card, cardId, playerColor, playerId }: CardProps) {
+export function Card({
+  card,
+  cardId,
+  playerColor,
+  playerId,
+  isInteractive = true,
+  forceFaceDown = false,
+}: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
   const [counterModal, setCounterModal] = useState<{
@@ -18,6 +27,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
     counterType?: string
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
+  const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Subscribe to counter types map
   useEffect(() => {
@@ -49,13 +59,13 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
     height: '160px',
     border: `3px solid ${playerColor}`,
     borderRadius: '8px',
-    backgroundColor: card.faceDown ? '#333' : '#fff',
+    backgroundColor: cardIsFaceDown ? '#333' : '#fff',
     padding: '0.5rem',
     position: 'relative',
     transition: 'transform 0.3s ease',
     transform: card.tapped ? 'rotate(90deg)' : 'rotate(0deg)',
     boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-    cursor: 'pointer',
+    cursor: isInteractive ? 'pointer' : 'default',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
@@ -125,6 +135,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
   )
 
   const handleTapToggle = (e: React.MouseEvent) => {
+    if (!isInteractive) return
     e.stopPropagation()
     setCardTapped(cardId, !card.tapped, playerId)
   }
@@ -135,7 +146,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
     setShowMenu(false)
   }
 
-  if (card.faceDown) {
+  if (cardIsFaceDown) {
     return (
       <div style={cardStyle} title={`Card ${cardId} (face down)`}>
         <div style={cardBackStyle}>🂠</div>
@@ -150,6 +161,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
         title={`Card ${cardId}`}
         onClick={handleTapToggle}
         onContextMenu={(e) => {
+          if (!isInteractive) return
           e.preventDefault()
           setShowMenu(!showMenu)
         }}
@@ -201,30 +213,32 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
         </div>
 
         {/* Move button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowMenu(!showMenu)
-          }}
-          style={{
-            position: 'absolute',
-            top: '5px',
-            left: '5px',
-            backgroundColor: 'rgba(255,255,255,0.9)',
-            border: '1px solid #333',
-            borderRadius: '4px',
-            padding: '2px 6px',
-            fontSize: '0.7rem',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-          }}
-        >
-          ⋮
-        </button>
+        {isInteractive && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowMenu(!showMenu)
+            }}
+            style={{
+              position: 'absolute',
+              top: '5px',
+              left: '5px',
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              border: '1px solid #333',
+              borderRadius: '4px',
+              padding: '2px 6px',
+              fontSize: '0.7rem',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            ⋮
+          </button>
+        )}
       </div>
 
       {/* Movement menu */}
-      {showMenu && (
+      {isInteractive && showMenu && (
         <>
           {/* Backdrop to close menu */}
           <div
@@ -543,7 +557,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
       )}
 
       {/* Counter Modals */}
-      {counterModal?.type === 'set' && counterModal.counterType && (
+      {isInteractive && counterModal?.type === 'set' && counterModal.counterType && (
         <NumberInputModal
           title={`Set ${counterModal.counterType} counters`}
           max={99}
@@ -556,7 +570,7 @@ export function Card({ card, cardId, playerColor, playerId }: CardProps) {
         />
       )}
 
-      {counterModal?.type === 'add' && (
+      {isInteractive && counterModal?.type === 'add' && (
         <TextInputModal
           title="Add Counter Type"
           placeholder="e.g., +1/+1, Loyalty, Charge"
