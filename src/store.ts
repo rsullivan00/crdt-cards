@@ -599,9 +599,19 @@ export function getRoomName(): string {
 export const provider = new WebrtcProvider(getRoomName(), ydoc, {
   signaling: [
     'wss://signaling.yjs.dev',
-    'wss://y-webrtc-signaling-eu.herokuapp.com',
     'wss://y-webrtc-signaling-us.herokuapp.com',
   ],
+  peerOpts: {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+      ]
+    }
+  }
 })
 
 // Log connection status
