@@ -595,23 +595,10 @@ export function getRoomName(): string {
 
 /**
  * WebRTC provider for peer-to-peer synchronization
+ * Using local signaling server on port 4444
  */
 export const provider = new WebrtcProvider(getRoomName(), ydoc, {
-  signaling: [
-    'wss://signaling.yjs.dev',
-    'wss://y-webrtc-signaling-us.herokuapp.com',
-  ],
-  peerOpts: {
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' },
-      ]
-    }
-  }
+  signaling: ['ws://localhost:4444'],
 })
 
 // Log connection status
