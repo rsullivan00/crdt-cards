@@ -771,38 +771,38 @@ const LAST_DECK_STORAGE_KEY = 'crdt-cards-last-deck'
 
 /**
  * Curated list of popular Commander starter decks
- * Using EDHRec average decks for reliable, always-available decklists
+ * Using local text files for reliable, offline-available decklists
  */
 export const STARTER_DECKS = [
   {
+    id: 'starter-atraxa',
+    name: 'Atraxa, Praetors\' Voice',
+    file: 'atraxa.txt',
+    description: 'Proliferate & Superfriends',
+  },
+  {
     id: 'starter-urdragon',
     name: 'The Ur-Dragon',
-    url: 'https://edhrec.com/average-decks/the-ur-dragon',
+    file: 'urdragon.txt',
     description: 'Dragon tribal powerhouse',
   },
   {
     id: 'starter-edgar',
     name: 'Edgar Markov',
-    url: 'https://edhrec.com/average-decks/edgar-markov',
+    file: 'edgar-markov.txt',
     description: 'Vampire tribal aggro',
-  },
-  {
-    id: 'starter-atraxa',
-    name: 'Atraxa, Praetors\' Voice',
-    url: 'https://edhrec.com/average-decks/atraxa-praetors-voice',
-    description: 'Proliferate & Superfriends',
   },
   {
     id: 'starter-krenko',
     name: 'Krenko, Mob Boss',
-    url: 'https://edhrec.com/average-decks/krenko-mob-boss',
+    file: 'krenko.txt',
     description: 'Goblin tribal combo',
   },
   {
-    id: 'starter-muldrotha',
-    name: 'Muldrotha, the Gravetide',
-    url: 'https://edhrec.com/average-decks/muldrotha-the-gravetide',
-    description: 'Graveyard recursion value',
+    id: 'starter-kaalia',
+    name: 'Kaalia of the Vast',
+    file: 'kaalia.txt',
+    description: 'Angels, Demons, Dragons',
   },
 ]
 
@@ -1041,6 +1041,71 @@ async function importFromEDHRec(
   return {
     success: false,
     error: 'EDHRec import not yet implemented. Please use Moxfield or Archidekt URLs for now.'
+  }
+}
+
+/**
+ * Import a deck from a local text file
+ * Format: each line is "quantity cardname"
+ */
+export async function importFromLocalFile(
+  filename: string,
+  deckName: string
+): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
+  try {
+    // Fetch the text file from public/starter-decks/
+    const response = await fetch(`/starter-decks/${filename}`)
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: false, error: `Starter deck file not found: ${filename}` }
+      }
+      return { success: false, error: `Failed to load starter deck (${response.status})` }
+    }
+
+    const text = await response.text()
+
+    // Parse the text file: each line is "quantity cardname"
+    const cards: Array<{ name: string; quantity: number }> = []
+    let cardCount = 0
+
+    const lines = text.split('\n')
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue // Skip empty lines
+
+      // Match "number cardname" format
+      const match = trimmed.match(/^(\d+)\s+(.+)$/)
+      if (match) {
+        const quantity = parseInt(match[1], 10)
+        const name = match[2].trim()
+        cards.push({ name, quantity })
+        cardCount += quantity
+      }
+    }
+
+    if (cards.length === 0) {
+      return { success: false, error: 'No cards found in starter deck file' }
+    }
+
+    // Create stored deck object
+    const deck: StoredDeck = {
+      id: crypto.randomUUID(),
+      name: deckName,
+      moxfieldUrl: `local://${filename}`,
+      moxfieldId: filename,
+      cardCount,
+      importedAt: Date.now(),
+      cards,
+    }
+
+    // Save to localStorage
+    saveDeck(deck)
+
+    return { success: true, deck }
+  } catch (e) {
+    console.error('Failed to import from local file:', e)
+    return { success: false, error: 'Failed to load starter deck file' }
   }
 }
 

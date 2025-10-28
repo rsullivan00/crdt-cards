@@ -308,7 +308,7 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                     fontSize: '0.875rem',
                   }}
                 >
-                  Moxfield Deck URL
+                  Deck URL (Moxfield, Archidekt, or EDHRec)
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input
@@ -316,7 +316,7 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                     type="text"
                     value={importUrl}
                     onChange={(e) => setImportUrl(e.target.value)}
-                    placeholder="https://www.moxfield.com/decks/..."
+                    placeholder="Paste deck URL from Moxfield, Archidekt, or EDHRec..."
                     disabled={isImporting}
                     style={{
                       flex: 1,

@@ -27,6 +27,7 @@ import {
   setLastUsedDeckId,
   STARTER_DECKS,
   importDeckFromMoxfield,
+  importFromLocalFile,
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
@@ -133,8 +134,8 @@ function App() {
     const starterDeck = STARTER_DECKS.find(d => d.id === deckId)
 
     if (starterDeck) {
-      // Import starter deck from its URL (Moxfield, Archidekt, or EDHRec)
-      const result = await importDeckFromMoxfield(starterDeck.url)
+      // Import starter deck from local file
+      const result = await importFromLocalFile(starterDeck.file, starterDeck.name)
       if (result.success && result.deck) {
         applyDeckToPlayer(playerId, result.deck)
         setLastUsedDeckId(result.deck.id) // Save the imported deck ID, not starter ID
