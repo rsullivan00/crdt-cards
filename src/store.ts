@@ -770,6 +770,43 @@ const DECKS_STORAGE_KEY = 'crdt-cards-decks'
 const LAST_DECK_STORAGE_KEY = 'crdt-cards-last-deck'
 
 /**
+ * Curated list of popular Commander starter decks
+ * Using EDHRec average decks for reliable, always-available decklists
+ */
+export const STARTER_DECKS = [
+  {
+    id: 'starter-urdragon',
+    name: 'The Ur-Dragon',
+    url: 'https://edhrec.com/average-decks/the-ur-dragon',
+    description: 'Dragon tribal powerhouse',
+  },
+  {
+    id: 'starter-edgar',
+    name: 'Edgar Markov',
+    url: 'https://edhrec.com/average-decks/edgar-markov',
+    description: 'Vampire tribal aggro',
+  },
+  {
+    id: 'starter-atraxa',
+    name: 'Atraxa, Praetors\' Voice',
+    url: 'https://edhrec.com/average-decks/atraxa-praetors-voice',
+    description: 'Proliferate & Superfriends',
+  },
+  {
+    id: 'starter-krenko',
+    name: 'Krenko, Mob Boss',
+    url: 'https://edhrec.com/average-decks/krenko-mob-boss',
+    description: 'Goblin tribal combo',
+  },
+  {
+    id: 'starter-muldrotha',
+    name: 'Muldrotha, the Gravetide',
+    url: 'https://edhrec.com/average-decks/muldrotha-the-gravetide',
+    description: 'Graveyard recursion value',
+  },
+]
+
+/**
  * Get all stored decks from localStorage
  */
 export function getStoredDecks(): StoredDeck[] {
@@ -833,9 +870,41 @@ export function setLastUsedDeckId(deckId: string): void {
 }
 
 /**
- * Import a deck from Moxfield URL
+ * Detect the deck platform from URL
+ */
+function detectDeckPlatform(url: string): 'moxfield' | 'archidekt' | 'edhrec' | 'unknown' {
+  const lower = url.toLowerCase()
+  if (lower.includes('moxfield.com')) return 'moxfield'
+  if (lower.includes('archidekt.com')) return 'archidekt'
+  if (lower.includes('edhrec.com')) return 'edhrec'
+  return 'unknown'
+}
+
+/**
+ * Import a deck from any supported platform (Moxfield, Archidekt, EDHRec)
  */
 export async function importDeckFromMoxfield(
+  deckUrl: string
+): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
+  const platform = detectDeckPlatform(deckUrl)
+
+  switch (platform) {
+    case 'moxfield':
+      return importFromMoxfield(deckUrl)
+    case 'archidekt':
+      return importFromArchidekt(deckUrl)
+    case 'edhrec':
+      return importFromEDHRec(deckUrl)
+    default:
+      // Try Moxfield format as fallback (might be just an ID)
+      return importFromMoxfield(deckUrl)
+  }
+}
+
+/**
+ * Import a deck from Moxfield
+ */
+async function importFromMoxfield(
   moxfieldUrl: string
 ): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
   try {
@@ -854,7 +923,7 @@ export async function importDeckFromMoxfield(
 
     if (!response.ok) {
       if (response.status === 404) {
-        return { success: false, error: 'Deck not found' }
+        return { success: false, error: 'Deck not found on Moxfield' }
       }
       return { success: false, error: `Failed to fetch deck (${response.status})` }
     }
@@ -889,8 +958,89 @@ export async function importDeckFromMoxfield(
 
     return { success: true, deck }
   } catch (e) {
-    console.error('Failed to import deck:', e)
+    console.error('Failed to import from Moxfield:', e)
     return { success: false, error: 'Network error or invalid deck' }
+  }
+}
+
+/**
+ * Import a deck from Archidekt
+ */
+async function importFromArchidekt(
+  archidektUrl: string
+): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
+  try {
+    // Extract deck ID from URL: https://archidekt.com/decks/12345
+    const match = archidektUrl.match(/archidekt\.com\/decks\/(\d+)/)
+    if (!match) {
+      return { success: false, error: 'Invalid Archidekt URL format' }
+    }
+
+    const deckId = match[1]
+
+    // Fetch from Archidekt API using CORS proxy
+    const archidektApiUrl = `https://archidekt.com/api/decks/${deckId}/`
+    const corsProxy = 'https://corsproxy.io/?'
+    const apiUrl = `${corsProxy}${encodeURIComponent(archidektApiUrl)}`
+
+    const response = await fetch(apiUrl)
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: false, error: 'Deck not found on Archidekt' }
+      }
+      return { success: false, error: `Failed to fetch deck (${response.status})` }
+    }
+
+    const data = await response.json()
+
+    // Parse cards from Archidekt format
+    const cards: Array<{ name: string; quantity: number }> = []
+    let cardCount = 0
+
+    if (data.cards && Array.isArray(data.cards)) {
+      for (const card of data.cards) {
+        const name = card.card?.oracleCard?.name || card.card?.name
+        const quantity = card.quantity || 1
+        if (name) {
+          cards.push({ name, quantity })
+          cardCount += quantity
+        }
+      }
+    }
+
+    // Create stored deck object
+    const deck: StoredDeck = {
+      id: crypto.randomUUID(),
+      name: data.name || 'Imported Deck',
+      moxfieldUrl: archidektUrl,
+      moxfieldId: deckId,
+      cardCount,
+      importedAt: Date.now(),
+      cards,
+    }
+
+    // Save to localStorage
+    saveDeck(deck)
+
+    return { success: true, deck }
+  } catch (e) {
+    console.error('Failed to import from Archidekt:', e)
+    return { success: false, error: 'Network error or invalid deck' }
+  }
+}
+
+/**
+ * Import a deck from EDHRec (average decks or deck previews)
+ */
+async function importFromEDHRec(
+  edhrecUrl: string
+): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
+  // TODO: Implement EDHRec scraping/parsing
+  // For now, return an error
+  return {
+    success: false,
+    error: 'EDHRec import not yet implemented. Please use Moxfield or Archidekt URLs for now.'
   }
 }
 

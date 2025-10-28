@@ -25,6 +25,8 @@ import {
   getStoredDecks,
   applyDeckToPlayer,
   setLastUsedDeckId,
+  STARTER_DECKS,
+  importDeckFromMoxfield,
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
@@ -121,20 +123,30 @@ function App() {
     }
   }, [])
 
-  const handleJoin = (name: string, deckId?: string) => {
+  const handleJoin = async (name: string, deckId: string) => {
     const playerId = crypto.randomUUID()
 
-    // Skip sample cards if joining with a deck
-    addPlayer(playerId, name, !!deckId)
+    // Skip sample cards when joining with a deck
+    addPlayer(playerId, name, true)
 
-    // Apply selected deck if provided
-    if (deckId) {
+    // Check if it's a starter deck or user deck
+    const starterDeck = STARTER_DECKS.find(d => d.id === deckId)
+
+    if (starterDeck) {
+      // Import starter deck from its URL (Moxfield, Archidekt, or EDHRec)
+      const result = await importDeckFromMoxfield(starterDeck.url)
+      if (result.success && result.deck) {
+        applyDeckToPlayer(playerId, result.deck)
+        setLastUsedDeckId(result.deck.id) // Save the imported deck ID, not starter ID
+        drawCards(playerId, 7)
+      }
+    } else {
+      // Use existing user deck
       const decks = getStoredDecks()
       const deck = decks.find(d => d.id === deckId)
       if (deck) {
         applyDeckToPlayer(playerId, deck)
         setLastUsedDeckId(deckId)
-        // Auto-draw 7 cards
         drawCards(playerId, 7)
       }
     }

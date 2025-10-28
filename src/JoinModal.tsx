@@ -5,10 +5,11 @@ import {
   getLastUsedDeckId,
   importDeckFromMoxfield,
   deleteDeck,
+  STARTER_DECKS,
 } from './store'
 
 interface JoinModalProps {
-  onJoin: (name: string, deckId?: string) => void
+  onJoin: (name: string, deckId: string) => void
   playerCount: number
 }
 
@@ -43,15 +44,20 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
 
     // Auto-select last used deck
     const lastDeckId = getLastUsedDeckId()
-    if (lastDeckId && decks.find(d => d.id === lastDeckId)) {
-      setSelectedDeckId(lastDeckId)
+    if (lastDeckId) {
+      // Check if it's a user deck or starter deck
+      const isUserDeck = decks.find(d => d.id === lastDeckId)
+      const isStarterDeck = STARTER_DECKS.find(d => d.id === lastDeckId)
+      if (isUserDeck || isStarterDeck) {
+        setSelectedDeckId(lastDeckId)
+      }
     }
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (name.trim()) {
-      onJoin(name.trim(), selectedDeckId || undefined)
+    if (name.trim() && selectedDeckId) {
+      onJoin(name.trim(), selectedDeckId)
     }
   }
 
@@ -88,8 +94,11 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
     }
   }
 
-  const selectedDeck = storedDecks.find(d => d.id === selectedDeckId)
+  const selectedUserDeck = storedDecks.find(d => d.id === selectedDeckId)
+  const selectedStarterDeck = STARTER_DECKS.find(d => d.id === selectedDeckId)
+  const selectedDeck = selectedUserDeck || selectedStarterDeck
   const isFull = playerCount >= 4
+  const canJoin = name.trim() && selectedDeckId
 
   return (
     <div
@@ -188,7 +197,7 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                   fontSize: '0.875rem',
                 }}
               >
-                Deck (Optional)
+                Deck (Required)
               </label>
               <select
                 id="deck-select"
@@ -214,12 +223,29 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                   backgroundColor: 'white',
                 }}
               >
-                <option value="">No deck (use sample cards)</option>
-                {storedDecks.map(deck => (
-                  <option key={deck.id} value={deck.id}>
-                    {deck.name} ({deck.cardCount} cards)
-                  </option>
-                ))}
+                <option value="">Select a deck...</option>
+
+                {/* My Decks Section */}
+                {storedDecks.length > 0 && (
+                  <optgroup label="💾 My Decks">
+                    {storedDecks.map(deck => (
+                      <option key={deck.id} value={deck.id}>
+                        {deck.name} ({deck.cardCount} cards)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {/* Starter Decks Section */}
+                <optgroup label="📦 Starter Decks">
+                  {STARTER_DECKS.map(deck => (
+                    <option key={deck.id} value={deck.id}>
+                      {deck.name} - {deck.description}
+                    </option>
+                  ))}
+                </optgroup>
+
+                {/* Import Option */}
                 <option value="__import__">+ Import New Deck...</option>
               </select>
 
@@ -238,22 +264,26 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                   }}
                 >
                   <span style={{ color: '#666' }}>
-                    {selectedDeck.cardCount} cards • Will draw 7 on join
+                    {selectedUserDeck && `${selectedUserDeck.cardCount} cards • `}
+                    Will draw 7 on join
+                    {selectedStarterDeck && ` • ${selectedStarterDeck.description}`}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteDeck(selectedDeck.id)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#F44336',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                    }}
-                  >
-                    Delete
-                  </button>
+                  {selectedUserDeck && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDeck(selectedUserDeck.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#F44336',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -329,32 +359,38 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!canJoin}
               style={{
                 width: '100%',
                 padding: '0.75rem',
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 color: 'white',
-                backgroundColor: name.trim() ? '#4CAF50' : '#ccc',
+                backgroundColor: canJoin ? '#4CAF50' : '#ccc',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: name.trim() ? 'pointer' : 'not-allowed',
+                cursor: canJoin ? 'pointer' : 'not-allowed',
                 transition: 'background-color 0.2s',
               }}
               onMouseEnter={(e) => {
-                if (name.trim()) {
+                if (canJoin) {
                   e.currentTarget.style.backgroundColor = '#45a049'
                 }
               }}
               onMouseLeave={(e) => {
-                if (name.trim()) {
+                if (canJoin) {
                   e.currentTarget.style.backgroundColor = '#4CAF50'
                 }
               }}
             >
               Join Game
             </button>
+
+            {!selectedDeckId && (
+              <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.75rem', color: '#FF9800', textAlign: 'center' }}>
+                Please select a deck to join
+              </p>
+            )}
           </form>
         )}
 
