@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, reorderCard } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
+import { useCardImage } from './hooks/useCardImage'
 
 // Module-level variable to track if any card is being dragged
 let isDraggingAnyCard = false
@@ -43,6 +44,11 @@ export function Card({
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const cardIsFaceDown = forceFaceDown || card.faceDown
+
+  // Fetch card image from Scryfall (only if not face down)
+  const { imageUrl, loading: imageLoading, error: imageError } = useCardImage(
+    cardIsFaceDown ? '' : card.oracleId
+  )
 
   // Subscribe to counter types map
   useEffect(() => {
@@ -203,10 +209,12 @@ export function Card({
       <div
         style={{
           ...cardStyle,
+          padding: 0, // Remove padding for image
+          overflow: 'hidden',
           opacity: isDragging ? 0.5 : 1,
           cursor: isInteractive ? 'grab' : 'default',
         }}
-        title={`Card ${cardId}`}
+        title={card.oracleId}
         draggable={isInteractive}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -217,33 +225,63 @@ export function Card({
           setShowMenu(!showMenu)
         }}
       >
-        <div
-          style={{
-            fontSize: '0.75rem',
-            fontWeight: 'bold',
-            wordBreak: 'break-all',
-          }}
-        >
-          {card.oracleId}
-        </div>
-
-        <div style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem' }}>
-          ID: {cardId.slice(0, 8)}
-        </div>
-
-        {card.tapped && (
+        {/* Card Image or Loading/Error State */}
+        {imageLoading ? (
           <div
             style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               fontSize: '0.7rem',
-              color: '#FF5722',
-              fontWeight: 'bold',
-              marginTop: '0.25rem',
+              color: '#999',
             }}
           >
-            ⭯ TAPPED
+            Loading...
+          </div>
+        ) : imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={card.oracleId}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: '5px',
+            }}
+          />
+        ) : (
+          // Fallback: Show text if image fails to load
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: '0.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+                wordBreak: 'break-all',
+              }}
+            >
+              {card.oracleId}
+            </div>
+            <div style={{ fontSize: '0.65rem', color: '#666' }}>
+              No image
+            </div>
           </div>
         )}
 
+        {/* Overlays */}
         {totalCounters > 0 && (
           <div style={counterBadgeStyle} title={`${totalCounters} counters`}>
             {totalCounters}
@@ -259,9 +297,25 @@ export function Card({
           </div>
         )}
 
-        <div style={{ fontSize: '0.6rem', color: '#999', marginTop: 'auto' }}>
-          v{card.v}
-        </div>
+        {card.tapped && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'rgba(255, 87, 34, 0.9)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              pointerEvents: 'none',
+            }}
+          >
+            ⭯ TAPPED
+          </div>
+        )}
 
         {/* Move button */}
         {isInteractive && (
@@ -274,13 +328,14 @@ export function Card({
               position: 'absolute',
               top: '5px',
               left: '5px',
-              backgroundColor: 'rgba(255,255,255,0.9)',
+              backgroundColor: 'rgba(255,255,255,0.95)',
               border: '1px solid #333',
               borderRadius: '4px',
               padding: '2px 6px',
               fontSize: '0.7rem',
               cursor: 'pointer',
               fontWeight: 'bold',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
             }}
           >
             ⋮
