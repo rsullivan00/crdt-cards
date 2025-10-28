@@ -38,6 +38,7 @@ export interface GameEvent {
   playerId: string
   action: string
   data: any
+  type?: 'chat' | 'game' // Distinguishes chat messages from game events
 }
 
 // ============================================================================
@@ -249,7 +250,8 @@ export function moveCard(
   cardId: string,
   newZoneId: string,
   newOrder?: number,
-  playerId?: string
+  playerId?: string,
+  skipLog?: boolean
 ): void {
   const card = cardsMap.get(cardId)
   if (!card) return
@@ -263,9 +265,10 @@ export function moveCard(
     v: card.v + 1, // Increment version for conflict resolution
   })
 
-  if (playerId) {
+  if (playerId && !skipLog) {
     logEvent(playerId, 'card_moved', {
       cardId,
+      oracleId: card.oracleId,
       from: oldZoneId,
       to: newZoneId,
       order: newOrder,
@@ -331,7 +334,21 @@ export function modifyCounters(
     counters[counterType] = newValue
   }
 
-  updateCard(cardId, { counters }, playerId)
+  cardsMap.set(cardId, {
+    ...card,
+    counters,
+    v: card.v + 1,
+  })
+
+  if (playerId) {
+    logEvent(playerId, 'counter_modified', {
+      cardId,
+      oracleId: card.oracleId,
+      counterType,
+      delta,
+      newValue,
+    })
+  }
 }
 
 /**
@@ -430,6 +447,20 @@ export function logEvent(playerId: string, action: string, data: any): void {
     playerId,
     action,
     data,
+    type: 'game',
+  }])
+}
+
+/**
+ * Send a chat message
+ */
+export function sendChatMessage(playerId: string, message: string): void {
+  logArray.push([{
+    timestamp: Date.now(),
+    playerId,
+    action: 'chat_message',
+    data: { message },
+    type: 'chat',
   }])
 }
 
@@ -479,12 +510,12 @@ export function drawCards(playerId: string, count: number): void {
 
   const nextHandOrder = getNextOrderInZone(handZoneId)
 
-  // Move top N cards from deck to hand
+  // Move top N cards from deck to hand (skip individual card_moved logs)
   for (let i = 0; i < actualCount; i++) {
     const card = deckCards[i]
     const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
     if (cardId) {
-      moveCard(cardId, handZoneId, nextHandOrder + i, playerId)
+      moveCard(cardId, handZoneId, nextHandOrder + i, playerId, true)
     }
   }
 
@@ -505,12 +536,12 @@ export function millCards(playerId: string, count: number): void {
 
   const nextGraveyardOrder = getNextOrderInZone(graveyardZoneId)
 
-  // Move top N cards from deck to graveyard
+  // Move top N cards from deck to graveyard (skip individual card_moved logs)
   for (let i = 0; i < actualCount; i++) {
     const card = deckCards[i]
     const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
     if (cardId) {
-      moveCard(cardId, graveyardZoneId, nextGraveyardOrder + i, playerId)
+      moveCard(cardId, graveyardZoneId, nextGraveyardOrder + i, playerId, true)
     }
   }
 
@@ -531,12 +562,12 @@ export function exileFromDeck(playerId: string, count: number): void {
 
   const nextExileOrder = getNextOrderInZone(exileZoneId)
 
-  // Move top N cards from deck to exile
+  // Move top N cards from deck to exile (skip individual card_moved logs)
   for (let i = 0; i < actualCount; i++) {
     const card = deckCards[i]
     const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
     if (cardId) {
-      moveCard(cardId, exileZoneId, nextExileOrder + i, playerId)
+      moveCard(cardId, exileZoneId, nextExileOrder + i, playerId, true)
     }
   }
 

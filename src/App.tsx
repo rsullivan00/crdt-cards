@@ -27,6 +27,7 @@ import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { LifeCounter } from './LifeCounter'
+import { ChatLog } from './ChatLog'
 
 type ViewMode = 'focused' | 'grid'
 
@@ -481,6 +482,17 @@ function App() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Chat Log Sidebar */}
+          <div
+            style={{
+              width: '300px',
+              backgroundColor: '#fff',
+              boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
+            }}
+          >
+            <ChatLog currentPlayerId={currentPlayerId} />
           </div>
         </div>
       ) : (
