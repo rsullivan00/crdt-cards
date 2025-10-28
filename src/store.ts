@@ -41,6 +41,16 @@ export interface GameEvent {
   type?: 'chat' | 'game' // Distinguishes chat messages from game events
 }
 
+export interface StoredDeck {
+  id: string
+  name: string
+  moxfieldUrl: string
+  moxfieldId: string
+  cardCount: number
+  importedAt: number
+  cards: Array<{ name: string; quantity: number }>
+}
+
 // ============================================================================
 // YJS DOCUMENT SETUP
 // ============================================================================
@@ -79,9 +89,9 @@ export function getPlayerColor(playerId: string): string {
 }
 
 /**
- * Add a new player to the game with zones and sample cards
+ * Add a new player to the game with zones and optionally sample cards
  */
-export function addPlayer(playerId: string, name: string): void {
+export function addPlayer(playerId: string, name: string, skipSampleCards: boolean = false): void {
   // Don't allow more than 4 players
   if (playersMap.size >= 4) {
     console.warn('Maximum of 4 players reached')
@@ -97,8 +107,10 @@ export function addPlayer(playerId: string, name: string): void {
   createZone(`graveyard-${playerId}`, 'graveyard', playerId)
   createZone(`exile-${playerId}`, 'exile', playerId)
 
-  // Add sample cards
-  addSampleCardsForPlayer(playerId)
+  // Add sample cards only if not importing a deck
+  if (!skipSampleCards) {
+    addSampleCardsForPlayer(playerId)
+  }
 
   logEvent(playerId, 'player_joined', { name })
 }
@@ -749,3 +761,198 @@ console.log('Game state maps ready:', {
   zones: zonesMap.size,
   cards: cardsMap.size,
 })
+
+// ============================================================================
+// DECK STORAGE (localStorage)
+// ============================================================================
+
+const DECKS_STORAGE_KEY = 'crdt-cards-decks'
+const LAST_DECK_STORAGE_KEY = 'crdt-cards-last-deck'
+
+/**
+ * Get all stored decks from localStorage
+ */
+export function getStoredDecks(): StoredDeck[] {
+  try {
+    const stored = localStorage.getItem(DECKS_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch (e) {
+    console.error('Failed to load stored decks:', e)
+    return []
+  }
+}
+
+/**
+ * Save a deck to localStorage
+ */
+export function saveDeck(deck: StoredDeck): void {
+  try {
+    const decks = getStoredDecks()
+    // Replace if exists, otherwise add
+    const existingIndex = decks.findIndex(d => d.id === deck.id)
+    if (existingIndex >= 0) {
+      decks[existingIndex] = deck
+    } else {
+      decks.push(deck)
+    }
+    localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks))
+  } catch (e) {
+    console.error('Failed to save deck:', e)
+  }
+}
+
+/**
+ * Delete a deck from localStorage
+ */
+export function deleteDeck(deckId: string): void {
+  try {
+    const decks = getStoredDecks().filter(d => d.id !== deckId)
+    localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks))
+
+    // Clear last deck if it was deleted
+    if (getLastUsedDeckId() === deckId) {
+      localStorage.removeItem(LAST_DECK_STORAGE_KEY)
+    }
+  } catch (e) {
+    console.error('Failed to delete deck:', e)
+  }
+}
+
+/**
+ * Get the last used deck ID
+ */
+export function getLastUsedDeckId(): string | null {
+  return localStorage.getItem(LAST_DECK_STORAGE_KEY)
+}
+
+/**
+ * Set the last used deck ID
+ */
+export function setLastUsedDeckId(deckId: string): void {
+  localStorage.setItem(LAST_DECK_STORAGE_KEY, deckId)
+}
+
+/**
+ * Import a deck from Moxfield URL
+ */
+export async function importDeckFromMoxfield(
+  moxfieldUrl: string
+): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
+  try {
+    // Extract deck ID from URL
+    const deckId = extractMoxfieldId(moxfieldUrl)
+    if (!deckId) {
+      return { success: false, error: 'Invalid Moxfield URL format' }
+    }
+
+    // Fetch deck from Moxfield API using CORS proxy
+    const moxfieldApiUrl = `https://api.moxfield.com/v2/decks/all/${deckId}`
+    const corsProxy = 'https://corsproxy.io/?'
+    const apiUrl = `${corsProxy}${encodeURIComponent(moxfieldApiUrl)}`
+
+    const response = await fetch(apiUrl)
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: false, error: 'Deck not found' }
+      }
+      return { success: false, error: `Failed to fetch deck (${response.status})` }
+    }
+
+    const data = await response.json()
+
+    // Parse mainboard cards
+    const cards: Array<{ name: string; quantity: number }> = []
+    let cardCount = 0
+
+    if (data.mainboard) {
+      for (const [cardName, cardData] of Object.entries(data.mainboard)) {
+        const quantity = (cardData as any).quantity || 1
+        cards.push({ name: cardName, quantity })
+        cardCount += quantity
+      }
+    }
+
+    // Create stored deck object
+    const deck: StoredDeck = {
+      id: crypto.randomUUID(),
+      name: data.name || 'Imported Deck',
+      moxfieldUrl,
+      moxfieldId: deckId,
+      cardCount,
+      importedAt: Date.now(),
+      cards,
+    }
+
+    // Save to localStorage
+    saveDeck(deck)
+
+    return { success: true, deck }
+  } catch (e) {
+    console.error('Failed to import deck:', e)
+    return { success: false, error: 'Network error or invalid deck' }
+  }
+}
+
+/**
+ * Extract Moxfield deck ID from URL
+ */
+function extractMoxfieldId(url: string): string | null {
+  // Support various formats:
+  // https://www.moxfield.com/decks/aBc123DeF
+  // https://moxfield.com/decks/aBc123DeF
+  // www.moxfield.com/decks/aBc123DeF
+  // moxfield.com/decks/aBc123DeF
+  // aBc123DeF (just the ID)
+
+  const trimmed = url.trim()
+
+  // Try to match URL with /decks/ path
+  let match = trimmed.match(/moxfield\.com\/decks\/([a-zA-Z0-9_-]+)/)
+  if (match) {
+    return match[1]
+  }
+
+  // If no match, assume it's just the ID (alphanumeric, underscore, hyphen)
+  if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+    return trimmed
+  }
+
+  return null
+}
+
+/**
+ * Apply a stored deck to a player
+ */
+export function applyDeckToPlayer(playerId: string, deck: StoredDeck): void {
+  const deckZoneId = `deck-${playerId}`
+
+  // Clear existing deck cards
+  const cardsToRemove: string[] = []
+  cardsMap.forEach((card, cardId) => {
+    if (card.zoneId === deckZoneId) {
+      cardsToRemove.push(cardId)
+    }
+  })
+  cardsToRemove.forEach(cardId => cardsMap.delete(cardId))
+
+  // Add cards from stored deck
+  let order = 0
+  for (const { name, quantity } of deck.cards) {
+    for (let i = 0; i < quantity; i++) {
+      addCard(
+        `${playerId}-deck-${name}-${i}`,
+        name,
+        playerId,
+        deckZoneId,
+        order++
+      )
+    }
+  }
+
+  // Log the import
+  logEvent(playerId, 'deck_imported', {
+    deckName: deck.name,
+    cardCount: deck.cardCount,
+  })
+}

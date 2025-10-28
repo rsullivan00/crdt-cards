@@ -22,6 +22,9 @@ import {
   Player,
   provider,
   getRoomName,
+  getStoredDecks,
+  applyDeckToPlayer,
+  setLastUsedDeckId,
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
@@ -118,9 +121,23 @@ function App() {
     }
   }, [])
 
-  const handleJoin = (name: string) => {
+  const handleJoin = (name: string, deckId?: string) => {
     const playerId = crypto.randomUUID()
-    addPlayer(playerId, name)
+
+    // Skip sample cards if joining with a deck
+    addPlayer(playerId, name, !!deckId)
+
+    // Apply selected deck if provided
+    if (deckId) {
+      const decks = getStoredDecks()
+      const deck = decks.find(d => d.id === deckId)
+      if (deck) {
+        applyDeckToPlayer(playerId, deck)
+        setLastUsedDeckId(deckId)
+        // Auto-draw 7 cards
+        drawCards(playerId, 7)
+      }
+    }
 
     // Save player ID to room-specific localStorage
     const storageKey = `crdt-cards-player-${getRoomName()}`
