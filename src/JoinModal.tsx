@@ -1,12 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface JoinModalProps {
   onJoin: (name: string) => void
   playerCount: number
 }
 
+const USERNAME_STORAGE_KEY = 'crdt-cards-username'
+
 export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
   const [name, setName] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Load saved username on mount
+  useEffect(() => {
+    const savedName = localStorage.getItem(USERNAME_STORAGE_KEY)
+    if (savedName) {
+      setName(savedName)
+      // Select the text for easy editing
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.select()
+        }
+      }, 100)
+    }
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,6 +91,7 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
                 Your Name
               </label>
               <input
+                ref={inputRef}
                 id="player-name"
                 type="text"
                 value={name}

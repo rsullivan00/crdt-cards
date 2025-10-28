@@ -74,13 +74,16 @@ function App() {
 
     const handleSynced = (event: { synced: boolean }) => {
       setSynced(event.synced)
-      // After sync, check if saved player still exists
-      if (savedPlayerId && !playersMap.has(savedPlayerId)) {
-        // Player was removed, show join modal again
-        localStorage.removeItem(storageKey)
-        setCurrentPlayerId(null)
-        setSelectedPlayerId(null)
-        setShowJoinModal(true)
+      // After sync, attempt to rejoin if we have a saved player ID
+      if (event.synced && savedPlayerId && !currentPlayerId) {
+        if (playersMap.has(savedPlayerId)) {
+          // Player still exists in the room - rejoin automatically
+          setCurrentPlayerId(savedPlayerId)
+          setSelectedPlayerId(savedPlayerId)
+          setShowJoinModal(false)
+          console.log('Rejoined as existing player:', savedPlayerId)
+        }
+        // If player doesn't exist, join modal is already shown
       }
     }
 
@@ -119,9 +122,12 @@ function App() {
     const playerId = crypto.randomUUID()
     addPlayer(playerId, name)
 
-    // Save to localStorage
+    // Save player ID to room-specific localStorage
     const storageKey = `crdt-cards-player-${getRoomName()}`
     localStorage.setItem(storageKey, playerId)
+
+    // Save username globally for reuse across rooms
+    localStorage.setItem('crdt-cards-username', name)
 
     setCurrentPlayerId(playerId)
     setSelectedPlayerId(playerId)
