@@ -7,6 +7,7 @@ import { WebrtcProvider } from 'y-webrtc'
 
 export interface Player {
   name: string
+  lifeTotal: number
 }
 
 export interface Zone {
@@ -86,7 +87,7 @@ export function addPlayer(playerId: string, name: string): void {
     return
   }
 
-  playersMap.set(playerId, { name })
+  playersMap.set(playerId, { name, lifeTotal: 40 })
 
   // Create zones for this player
   createZone(`deck-${playerId}`, 'deck', playerId)
@@ -356,6 +357,42 @@ export function detachCard(cardId: string, targetCardId: string, playerId?: stri
 }
 
 /**
+ * Set a player's life total to an exact value
+ */
+export function setLifeTotal(playerId: string, newTotal: number, actionPlayerId?: string): void {
+  const player = playersMap.get(playerId)
+  if (!player) return
+
+  playersMap.set(playerId, {
+    ...player,
+    lifeTotal: newTotal,
+  })
+
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'life_total_set', { playerId, newTotal })
+  }
+}
+
+/**
+ * Modify a player's life total by a delta amount
+ */
+export function modifyLifeTotal(playerId: string, delta: number, actionPlayerId?: string): void {
+  const player = playersMap.get(playerId)
+  if (!player) return
+
+  const newTotal = player.lifeTotal + delta
+
+  playersMap.set(playerId, {
+    ...player,
+    lifeTotal: newTotal,
+  })
+
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'life_total_modified', { playerId, delta, newTotal })
+  }
+}
+
+/**
  * Set the turn baton (current player and phase/step)
  */
 export function setTurnBaton(playerId: string, step: string): void {
@@ -575,6 +612,60 @@ export function moveCardToZone(
   } else {
     // Auto: append to end
     newOrder = getNextOrderInZone(targetZoneId)
+  }
+
+  moveCard(cardId, targetZoneId, newOrder, playerId)
+}
+
+/**
+ * Reorder a card by inserting it before or after a target card
+ */
+export function reorderCard(
+  cardId: string,
+  targetZoneId: string,
+  insertBeforeCardId: string | null,
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const zoneCards = getCardsInZone(targetZoneId).filter(c => {
+    const cId = Array.from(cardsMap.entries()).find(([_, card]) => card === c)?.[0]
+    return cId !== cardId // Exclude the card being moved
+  })
+
+  let newOrder: number
+
+  if (!insertBeforeCardId) {
+    // Append to end
+    newOrder = zoneCards.length > 0
+      ? Math.max(...zoneCards.map(c => c.order)) + 1
+      : 0
+  } else {
+    // Find the target card
+    const targetCard = cardsMap.get(insertBeforeCardId)
+    if (!targetCard) {
+      newOrder = getNextOrderInZone(targetZoneId)
+    } else {
+      // Find card before target in sorted order
+      const sortedCards = zoneCards.sort((a, b) => a.order - b.order)
+      const targetIndex = sortedCards.findIndex(c => {
+        const cId = Array.from(cardsMap.entries()).find(([_, card]) => card === c)?.[0]
+        return cId === insertBeforeCardId
+      })
+
+      if (targetIndex === 0) {
+        // Insert at beginning - use half of first card's order
+        newOrder = targetCard.order / 2
+      } else if (targetIndex > 0) {
+        // Insert between two cards - use average
+        const prevCard = sortedCards[targetIndex - 1]
+        newOrder = (prevCard.order + targetCard.order) / 2
+      } else {
+        // Target not found, append to end
+        newOrder = getNextOrderInZone(targetZoneId)
+      }
+    }
   }
 
   moveCard(cardId, targetZoneId, newOrder, playerId)

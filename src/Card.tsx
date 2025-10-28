@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, reorderCard } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
+
+// Module-level variable to track if any card is being dragged
+let isDraggingAnyCard = false
+
+// Callback to update zones when drag state changes
+let onDragStateChange: (() => void) | null = null
+
+// Export function to check if dragging
+export const getIsDragging = () => isDraggingAnyCard
+
+// Export function to set drag state change callback
+export const setDragStateChangeCallback = (callback: (() => void) | null) => {
+  onDragStateChange = callback
+}
 
 interface CardProps {
   card: CardType
@@ -27,6 +41,7 @@ export function Card({
     counterType?: string
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
+  const [isDragging, setIsDragging] = useState(false)
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Subscribe to counter types map
@@ -146,6 +161,30 @@ export function Card({
     setShowMenu(false)
   }
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!isInteractive) {
+      e.preventDefault()
+      return
+    }
+    setIsDragging(true)
+    isDraggingAnyCard = true
+    onDragStateChange?.()
+
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('cardId', cardId)
+    e.dataTransfer.setData('fromZoneId', card.zoneId)
+    e.dataTransfer.setData('playerId', playerId)
+    e.dataTransfer.setData('order', card.order.toString())
+  }
+
+  const handleDragEnd = () => {
+    setIsDragging(false)
+    isDraggingAnyCard = false
+    onDragStateChange?.()
+  }
+
+  // Removed old drag over/drop handlers - will use grid-based drop targets in Zone instead
+
   if (cardIsFaceDown) {
     return (
       <div style={cardStyle} title={`Card ${cardId} (face down)`}>
@@ -155,10 +194,22 @@ export function Card({
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div
+      style={{ position: 'relative' }}
+      data-card-id={cardId}
+      data-order={card.order}
+      data-zone-id={card.zoneId}
+    >
       <div
-        style={cardStyle}
+        style={{
+          ...cardStyle,
+          opacity: isDragging ? 0.5 : 1,
+          cursor: isInteractive ? 'grab' : 'default',
+        }}
         title={`Card ${cardId}`}
+        draggable={isInteractive}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onClick={handleTapToggle}
         onContextMenu={(e) => {
           if (!isInteractive) return

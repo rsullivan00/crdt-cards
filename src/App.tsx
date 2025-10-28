@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+  import { useEffect, useState } from 'react'
 import {
   ydoc,
   playersMap,
@@ -26,6 +26,7 @@ import {
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
+import { LifeCounter } from './LifeCounter'
 
 type ViewMode = 'focused' | 'grid'
 
@@ -348,62 +349,73 @@ function App() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {players.map(({ id, player }) => (
-                <div
-                  key={id}
-                  onClick={() => setSelectedPlayerId(id)}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: id === viewedPlayerId ? getPlayerColor(id) : '#f5f5f5',
-                    color: id === viewedPlayerId ? 'white' : '#333',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: id === viewedPlayerId ? 'bold' : 'normal',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (id !== viewedPlayerId) {
-                      e.currentTarget.style.backgroundColor = '#e0e0e0'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (id !== viewedPlayerId) {
-                      e.currentTarget.style.backgroundColor = '#f5f5f5'
-                    }
-                  }}
-                >
-                  <span>
-                    {player.name}
-                    {id === currentPlayerId && ' (You)'}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemovePlayer(id, player.name)
-                    }}
+                <div key={id}>
+                  <div
+                    onClick={() => setSelectedPlayerId(id)}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: id === viewedPlayerId ? 'white' : '#666',
+                      padding: '0.75rem',
+                      backgroundColor: id === viewedPlayerId ? getPlayerColor(id) : '#f5f5f5',
+                      color: id === viewedPlayerId ? 'white' : '#333',
+                      borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      lineHeight: 1,
-                      padding: '0 0.25rem',
-                      opacity: 0.7,
+                      fontSize: '0.875rem',
+                      fontWeight: id === viewedPlayerId ? 'bold' : 'normal',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'all 0.2s',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '1'
+                      if (id !== viewedPlayerId) {
+                        e.currentTarget.style.backgroundColor = '#e0e0e0'
+                      }
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '0.7'
+                      if (id !== viewedPlayerId) {
+                        e.currentTarget.style.backgroundColor = '#f5f5f5'
+                      }
                     }}
-                    title={`Remove ${player.name}`}
                   >
-                    ×
-                  </button>
+                    <span>
+                      {player.name}
+                      {id === currentPlayerId && ' (You)'}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemovePlayer(id, player.name)
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: id === viewedPlayerId ? 'white' : '#666',
+                        cursor: 'pointer',
+                        fontSize: '1.2rem',
+                        lineHeight: 1,
+                        padding: '0 0.25rem',
+                        opacity: 0.7,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '1'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '0.7'
+                      }}
+                      title={`Remove ${player.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {currentPlayerId && (
+                    <LifeCounter
+                      playerId={id}
+                      playerName={player.name}
+                      lifeTotal={player.lifeTotal}
+                      playerColor={getPlayerColor(id)}
+                      currentPlayerId={currentPlayerId}
+                      compact={true}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -453,6 +465,7 @@ function App() {
                 {getPlayerZones(viewedPlayerId).map(({ id: zoneId, zone }) => (
                   <Zone
                     key={zoneId}
+                    zoneId={zoneId}
                     zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
                     zoneType={zone.type}
                     cards={getZoneCards(zoneId)}
@@ -539,10 +552,21 @@ function App() {
                       ×
                     </button>
                   </h2>
+                  {currentPlayerId && (
+                    <LifeCounter
+                      playerId={id}
+                      playerName={player.name}
+                      lifeTotal={player.lifeTotal}
+                      playerColor={playerColor}
+                      currentPlayerId={currentPlayerId}
+                      compact={false}
+                    />
+                  )}
                   <div style={{ flex: 1, overflow: 'auto' }}>
                     {zones.map(({ id: zoneId, zone }) => (
                       <Zone
                         key={zoneId}
+                        zoneId={zoneId}
                         zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
                         zoneType={zone.type}
                         cards={getZoneCards(zoneId)}
