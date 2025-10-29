@@ -729,10 +729,15 @@ export function getRoomName(): string {
 
 /**
  * WebRTC provider for peer-to-peer synchronization
- * Using local signaling server on port 4444
+ * Using Azure-hosted signaling server with public fallbacks
  */
 export const provider = new WebrtcProvider(getRoomName(), ydoc, {
-  signaling: ['ws://localhost:4444'],
+  signaling: [
+    'wss://crdt-cards-signaling.happyground-bfbe302d.westus2.azurecontainerapps.io',
+    'wss://signaling.yjs.dev',
+    'wss://y-webrtc-signaling-eu.herokuapp.com',
+    'wss://y-webrtc-signaling-us.herokuapp.com',
+  ],
 })
 
 // Log connection status
