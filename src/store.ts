@@ -722,8 +722,9 @@ export function reorderCard(
  * Get the room name from URL path or use default
  */
 export function getRoomName(): string {
-  const path = window.location.pathname.slice(1) // Remove leading '/'
-  const roomId = path || 'default'
+  // Use hash-based routing for room name
+  const hash = window.location.hash.replace(/^#/, '')
+  const roomId = hash || 'default'
   return `crdt-cards-${roomId}`
 }
 
