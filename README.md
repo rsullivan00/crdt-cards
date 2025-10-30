@@ -11,4 +11,4 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5174/#your-room-name` in your browser. Enter your name to join. Share the URL with friends to play together - all game state syncs automatically in real-time.
+Open `http://localhost:5174/your-room-name` in your browser. Enter your name to join. Share the URL with friends to play together - all game state syncs automatically in real-time.

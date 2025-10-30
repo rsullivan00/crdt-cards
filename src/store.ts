@@ -719,24 +719,21 @@ export function reorderCard(
 // ============================================================================
 
 /**
- * Get the room name from URL hash or use default
+ * Get the room name from URL path or use default
  */
 export function getRoomName(): string {
-  const hash = window.location.hash.slice(1) // Remove '#'
-  const roomId = hash || 'default'
+  const path = window.location.pathname.slice(1) // Remove leading '/'
+  const roomId = path || 'default'
   return `crdt-cards-${roomId}`
 }
 
 /**
  * WebRTC provider for peer-to-peer synchronization
- * Using Azure-hosted signaling server with public fallbacks
+ * Using Azure-hosted signaling server
  */
 export const provider = new WebrtcProvider(getRoomName(), ydoc, {
   signaling: [
     'wss://crdt-cards-signaling.happyground-bfbe302d.westus2.azurecontainerapps.io',
-    'wss://signaling.yjs.dev',
-    'wss://y-webrtc-signaling-eu.herokuapp.com',
-    'wss://y-webrtc-signaling-us.herokuapp.com',
   ],
 })
 
@@ -749,8 +746,10 @@ provider.on('synced', (event: { synced: boolean }) => {
   console.log('YJS synced:', event.synced)
 })
 
-// Listen for URL hash changes (room switching)
-window.addEventListener('hashchange', () => {
+// Listen for URL path changes (room switching)
+// Note: For SPA routing, navigation should use history.pushState
+// and we listen for popstate (back/forward button)
+window.addEventListener('popstate', () => {
   console.log('Room changed, reloading to connect to new room...')
   window.location.reload()
 })
