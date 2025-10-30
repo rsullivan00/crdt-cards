@@ -898,7 +898,7 @@ export async function importDeckFromMoxfield(
     case 'archidekt':
       return importFromArchidekt(deckUrl)
     case 'edhrec':
-      return importFromEDHRec(deckUrl)
+  return importFromEDHRec()
     default:
       // Try Moxfield format as fallback (might be just an ID)
       return importFromMoxfield(deckUrl)
@@ -1038,7 +1038,7 @@ async function importFromArchidekt(
  * Import a deck from EDHRec (average decks or deck previews)
  */
 async function importFromEDHRec(
-  edhrecUrl: string
+
 ): Promise<{ success: boolean; deck?: StoredDeck; error?: string }> {
   // TODO: Implement EDHRec scraping/parsing
   // For now, return an error

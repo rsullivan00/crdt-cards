@@ -331,7 +331,7 @@ export function Zone({
                 key={id}
                 cardId={id}
                 card={card}
-                playerColor={playerColor}
+
                 playerId={playerId}
                 isInteractive={isInteractive}
                 forceFaceDown={shouldHideCard}

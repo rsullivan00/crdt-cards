@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { logArray, playersMap, cardsMap, zonesMap, getPlayerColor, sendChatMessage, GameEvent } from './store'
+import { logArray, playersMap, zonesMap, getPlayerColor, sendChatMessage, GameEvent } from './store'
 
 type FilterMode = 'all' | 'chat' | 'game'
 

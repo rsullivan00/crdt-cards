@@ -2,17 +2,15 @@ import { useState } from 'react'
 import { modifyLifeTotal } from './store'
 
 interface LifeCounterProps {
-  playerId: string
-  playerName: string
-  lifeTotal: number
-  playerColor: string
-  currentPlayerId: string
-  compact?: boolean
+  playerId: string;
+  lifeTotal: number;
+  playerColor: string;
+  currentPlayerId: string;
+  compact?: boolean;
 }
 
 export function LifeCounter({
   playerId,
-  playerName,
   lifeTotal,
   playerColor,
   currentPlayerId,

@@ -1,6 +1,5 @@
   import { useEffect, useState } from 'react'
 import {
-  ydoc,
   playersMap,
   zonesMap,
   cardsMap,
@@ -12,8 +11,8 @@ import {
   millCards,
   exileFromDeck,
   shuffleDeck,
-  moveCard,
-  setCardTapped,
+
+
   getTurnBaton,
   setTurnBaton,
   getPlayerColor,
@@ -26,7 +25,7 @@ import {
   applyDeckToPlayer,
   setLastUsedDeckId,
   STARTER_DECKS,
-  importDeckFromMoxfield,
+
   importFromLocalFile,
 } from './store'
 import { Zone } from './Zone'
@@ -446,7 +445,7 @@ function App() {
                   {currentPlayerId && (
                     <LifeCounter
                       playerId={id}
-                      playerName={player.name}
+
                       lifeTotal={player.lifeTotal}
                       playerColor={getPlayerColor(id)}
                       currentPlayerId={currentPlayerId}
@@ -603,7 +602,7 @@ function App() {
                   {currentPlayerId && (
                     <LifeCounter
                       playerId={id}
-                      playerName={player.name}
+                      // removed playerName prop
                       lifeTotal={player.lifeTotal}
                       playerColor={playerColor}
                       currentPlayerId={currentPlayerId}

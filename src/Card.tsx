@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, reorderCard } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -19,18 +19,16 @@ export const setDragStateChangeCallback = (callback: (() => void) | null) => {
 }
 
 interface CardProps {
-  card: CardType
-  cardId: string
-  playerColor: string
-  playerId: string
-  isInteractive?: boolean
-  forceFaceDown?: boolean
+  card: CardType;
+  cardId: string;
+  playerId: string;
+  isInteractive?: boolean;
+  forceFaceDown?: boolean;
 }
 
 export function Card({
   card,
   cardId,
-  playerColor,
   playerId,
   isInteractive = true,
   forceFaceDown = false,
@@ -46,7 +44,7 @@ export function Card({
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Fetch card image from Scryfall (only if not face down)
-  const { imageUrl, loading: imageLoading, error: imageError } = useCardImage(
+  const { imageUrl, loading: imageLoading } = useCardImage(
     cardIsFaceDown ? '' : card.oracleId
   )
 
