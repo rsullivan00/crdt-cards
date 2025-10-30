@@ -4,6 +4,12 @@ A real-time multiplayer card game built with CRDTs (Conflict-free Replicated Dat
 
 Built with React, TypeScript, YJS, and y-webrtc for distributed state management.
 
+## ⚠️ VIBE CODE WARNING
+
+This app is completely coded with AI agents. I'm reviewing changes only as well as I can while playing MTG Arena at the same time.
+
+Do with that information what you will.
+
 ## Quick Start
 
 ```bash
