@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { Card as CardComponent, getIsDragging, setDragStateChangeCallback } from './Card'
+import { useState } from 'react'
+import { Card as CardComponent } from './Card'
 import { Card as CardType, moveCardToZone } from './store'
 import { NumberInputModal } from './NumberInputModal'
-import { DropTarget } from './DropTarget'
 
 interface ZoneProps {
   zoneName: string
@@ -38,25 +37,6 @@ export function Zone({
     onConfirm: (value: number) => void
   } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [isAnyCardDragging, setIsAnyCardDragging] = useState(false)
-  const zoneRef = useRef<HTMLDivElement>(null)
-
-  // Subscribe to global drag state changes
-  useEffect(() => {
-    const updateDragState = () => {
-      setIsAnyCardDragging(getIsDragging())
-    }
-
-    setDragStateChangeCallback(updateDragState)
-    return () => {
-      setDragStateChangeCallback(null)
-    }
-  }, [])
-
-  // Constants for grid calculation
-  const CARD_WIDTH = 120
-  const CARD_GAP = 16
-  const SLOT_WIDTH = CARD_WIDTH + CARD_GAP
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -320,7 +300,6 @@ export function Zone({
       </div>
 
       <div
-        ref={zoneRef}
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -329,119 +308,36 @@ export function Zone({
           alignItems: 'flex-start',
         }}
       >
-        {isAnyCardDragging ? (
-          // Show cards with drop targets between them when dragging
-          (() => {
-            // Sort cards by order
-            const sortedCards = [...cards].sort((a, b) => a.card.order - b.card.order)
-
-            if (sortedCards.length === 0) {
-              // Empty zone - show single drop target
-              return (
-                <DropTarget
-                  key="drop-empty"
-                  slotIndex={0}
-                  zoneId={zoneId}
-                  playerId={playerId}
-                  insertBeforeCardId={null}
-                />
-              )
-            }
-
-            // Render cards with drop targets between them
-            const elements = []
-
-            // Drop target before first card
-            elements.push(
-              <DropTarget
-                key="drop-start"
-                slotIndex={0}
-                zoneId={zoneId}
-                playerId={playerId}
-                insertBeforeCardId={sortedCards[0].id}
-              />
-            )
-
-            // Render each card followed by a drop target
-            sortedCards.forEach((cardData, index) => {
-              const shouldHideCard =
-                zoneType === 'hand' &&
-                !!viewerPlayerId &&
-                playerId !== viewerPlayerId
-
-              // Render the card
-              elements.push(
-                <CardComponent
-                  key={cardData.id}
-                  cardId={cardData.id}
-                  card={cardData.card}
-                  playerColor={playerColor}
-                  playerId={playerId}
-                  isInteractive={isInteractive}
-                  forceFaceDown={shouldHideCard}
-                />
-              )
-
-              // Render drop target after this card (except after the last card, we'll handle that separately)
-              if (index < sortedCards.length - 1) {
-                elements.push(
-                  <DropTarget
-                    key={`drop-${index}`}
-                    slotIndex={index + 1}
-                    zoneId={zoneId}
-                    playerId={playerId}
-                    insertBeforeCardId={sortedCards[index + 1].id}
-                  />
-                )
-              }
-            })
-
-            // Drop target after last card
-            elements.push(
-              <DropTarget
-                key="drop-end"
-                slotIndex={sortedCards.length}
-                zoneId={zoneId}
-                playerId={playerId}
-                insertBeforeCardId={null}
-              />
-            )
-
-            return elements
-          })()
+        {cards.length === 0 ? (
+          <div
+            style={{
+              color: '#999',
+              fontStyle: 'italic',
+              fontSize: '0.875rem',
+              padding: '1rem',
+            }}
+          >
+            No cards in this zone
+          </div>
         ) : (
-          // Normal rendering when not dragging
-          cards.length === 0 ? (
-            <div
-              style={{
-                color: '#999',
-                fontStyle: 'italic',
-                fontSize: '0.875rem',
-                padding: '1rem',
-              }}
-            >
-              No cards in this zone
-            </div>
-          ) : (
-            cards.map(({ id, card }) => {
-              const shouldHideCard =
-                zoneType === 'hand' &&
-                !!viewerPlayerId &&
-                playerId !== viewerPlayerId
+          cards.map(({ id, card }) => {
+            const shouldHideCard =
+              zoneType === 'hand' &&
+              !!viewerPlayerId &&
+              playerId !== viewerPlayerId
 
-              return (
-                <CardComponent
-                  key={id}
-                  cardId={id}
-                  card={card}
-                  playerColor={playerColor}
-                  playerId={playerId}
-                  isInteractive={isInteractive}
-                  forceFaceDown={shouldHideCard}
-                />
-              )
-            })
-          )
+            return (
+              <CardComponent
+                key={id}
+                cardId={id}
+                card={card}
+                playerColor={playerColor}
+                playerId={playerId}
+                isInteractive={isInteractive}
+                forceFaceDown={shouldHideCard}
+              />
+            )
+          })
         )}
       </div>
     </div>
