@@ -383,7 +383,6 @@ export function Zone({
         backgroundColor: isDragOver ? '#e3f2fd' : '#f5f5f5',
         borderRadius: '8px',
         padding: '1rem',
-        paddingTop: '1.5rem',
         marginBottom: '1rem',
         minHeight: '200px',
         border: isDragOver ? '2px dashed #2196F3' : '2px solid transparent',
@@ -430,6 +429,7 @@ export function Zone({
           overflowY: 'visible',
           minHeight: '160px',
           alignItems: 'flex-start',
+          paddingTop: '1rem',
           paddingBottom: '0.5rem',
         }}
       >
