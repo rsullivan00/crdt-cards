@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap } from './store'
+import { useState, useEffect, useRef } from 'react'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, setCardPosition } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -41,7 +41,12 @@ export function Card({
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [localPosition, setLocalPosition] = useState<{ x: number; y: number } | null>(null)
+  const debounceTimerRef = useRef<number | null>(null)
   const cardIsFaceDown = forceFaceDown || card.faceDown
+
+  // Determine if this card is in battlefield zone
+  const isInBattlefield = card.zoneId.startsWith('battlefield-')
 
   // Fetch card image from Scryfall (only if not face down)
   const { imageUrl, loading: imageLoading } = useCardImage(
@@ -196,9 +201,21 @@ export function Card({
     )
   }
 
+  // Determine positioning style based on zone and position
+  const wrapperStyle: React.CSSProperties = isInBattlefield && card.position
+    ? {
+        position: 'absolute',
+        left: `${card.position.x}px`,
+        top: `${card.position.y}px`,
+        zIndex: card.order, // Use order as z-index so last-moved cards are on top
+      }
+    : {
+        position: 'relative',
+      }
+
   return (
     <div
-      style={{ position: 'relative' }}
+      style={wrapperStyle}
       data-card-id={cardId}
       data-order={card.order}
       data-zone-id={card.zoneId}

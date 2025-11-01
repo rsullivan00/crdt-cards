@@ -19,13 +19,14 @@ export interface Card {
   oracleId: string // external reference to card data/art
   owner: string // playerId
   zoneId: string
-  order: number // sortable key inside zone (supports stable deck order)
+  order: number // sortable key inside zone (supports stable deck order) - also used as z-index for battlefield
   faceDown: boolean
   tapped: boolean
   counters: { [key: string]: number } // e.g., { '+1/+1': 3, 'loyalty': 4 }
   attachments: string[] // array of cardIds (auras/equipment)
   metadata: { [key: string]: any } // tokens, notes, etc.
   v: number // version counter - bump this each move for concurrency resolution
+  position?: { x: number; y: number } // optional absolute positioning (battlefield only)
 }
 
 export interface Baton {
@@ -322,6 +323,36 @@ export function setCardTapped(cardId: string, tapped: boolean, playerId?: string
  */
 export function setCardFaceDown(cardId: string, faceDown: boolean, playerId?: string): void {
   updateCard(cardId, { faceDown }, playerId)
+}
+
+/**
+ * Set the absolute position of a card (for battlefield free positioning)
+ */
+export function setCardPosition(
+  cardId: string,
+  x: number,
+  y: number,
+  playerId?: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  // Get the highest order in the zone to place this card on top
+  const zoneCards = getCardsInZone(card.zoneId)
+  const maxOrder = zoneCards.length > 0
+    ? Math.max(...zoneCards.map(c => c.order))
+    : 0
+  const newOrder = maxOrder + 1
+
+  cardsMap.set(cardId, {
+    ...card,
+    position: { x, y },
+    order: newOrder, // Update order to bring to front (z-index)
+    v: card.v + 1,
+  })
+
+  // Don't log card_positioned events - they're too frequent and noisy
+  // The position updates are still synced via CRDT
 }
 
 /**

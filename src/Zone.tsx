@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Card as CardComponent } from './Card'
-import { Card as CardType, moveCardToZone } from './store'
+import { Card as CardType, moveCardToZone, setCardPosition } from './store'
 import { NumberInputModal } from './NumberInputModal'
 
 interface ZoneProps {
@@ -37,6 +37,7 @@ export function Zone({
     onConfirm: (value: number) => void
   } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const battlefieldRef = useRef<HTMLDivElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -62,7 +63,23 @@ export function Zone({
       return
     }
 
-    // Don't do anything if dropping in the same zone (reordering handled separately)
+    // For battlefield zone, calculate drop position
+    if (zoneType === 'battlefield' && battlefieldRef.current) {
+      const rect = battlefieldRef.current.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+
+      // If dropping from a different zone, move card first then set position
+      if (fromZoneId !== zoneId) {
+        moveCardToZone(cardId, zoneId, 'auto', playerId)
+      }
+
+      // Set the position (this will also update if already in battlefield)
+      setCardPosition(cardId, x, y, playerId)
+      return
+    }
+
+    // For other zones, don't do anything if dropping in the same zone
     if (fromZoneId === zoneId) {
       return
     }
@@ -257,7 +274,87 @@ export function Zone({
     )
   }
 
-  // Regular zones (hand, battlefield, graveyard, exile)
+  // Battlefield zone with absolute positioning
+  if (zoneType === 'battlefield') {
+    return (
+      <div
+        style={{
+          backgroundColor: isDragOver ? '#e3f2fd' : '#f5f5f5',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1rem',
+          minHeight: '400px',
+          border: isDragOver ? '2px dashed #2196F3' : '2px solid transparent',
+          transition: 'all 0.2s ease',
+          position: 'relative', // Important for absolute positioning of cards
+        }}
+        data-zone-id={zoneId}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
+            {zoneName}
+          </h3>
+          <span
+            style={{
+              backgroundColor: playerColor,
+              color: 'white',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+            }}
+          >
+            {cards.length} cards
+          </span>
+        </div>
+
+        {/* Battlefield cards with absolute positioning */}
+        <div
+          ref={battlefieldRef}
+          style={{
+            position: 'relative',
+            minHeight: '340px',
+          }}
+        >
+          {cards.length === 0 ? (
+            <div
+              style={{
+                color: '#999',
+                fontStyle: 'italic',
+                fontSize: '0.875rem',
+                padding: '1rem',
+              }}
+            >
+              No cards on battlefield
+            </div>
+          ) : (
+            cards.map(({ id, card }) => (
+              <CardComponent
+                key={id}
+                cardId={id}
+                card={card}
+                playerId={playerId}
+                isInteractive={isInteractive}
+                forceFaceDown={false}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Regular zones (hand, graveyard, exile) with flex layout
   return (
     <div
       style={{
