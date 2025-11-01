@@ -1,4 +1,4 @@
-  import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   playersMap,
   zonesMap,
@@ -11,13 +11,10 @@ import {
   millCards,
   exileFromDeck,
   shuffleDeck,
-
-
   getTurnBaton,
   setTurnBaton,
   getPlayerColor,
   Card as CardType,
-  Zone as ZoneType,
   Player,
   provider,
   getRoomName,
@@ -25,16 +22,16 @@ import {
   applyDeckToPlayer,
   setLastUsedDeckId,
   STARTER_DECKS,
-
   importFromLocalFile,
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
-import { LifeCounter } from './LifeCounter'
-import { ChatLog } from './ChatLog'
-
-type ViewMode = 'focused' | 'grid'
+import { OpponentBar } from './OpponentBar'
+import { ChatOverlay } from './ChatOverlay'
+import { ZoneDrawer } from './ZoneDrawer'
+import { CompactDeck } from './CompactDeck'
+import { CompactLifeCounter } from './CompactLifeCounter'
 
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
@@ -48,9 +45,10 @@ function App() {
   } | null>(null)
   const [, forceUpdate] = useState({})
 
-  // New layout state
-  const [viewMode, setViewMode] = useState<ViewMode>('focused')
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  // New UI state
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if player already joined this room
@@ -58,18 +56,9 @@ function App() {
     const savedPlayerId = localStorage.getItem(storageKey)
 
     if (savedPlayerId && playersMap.has(savedPlayerId)) {
-      // Player already exists in this room
       setCurrentPlayerId(savedPlayerId)
-      setSelectedPlayerId(savedPlayerId) // Default to viewing own board
     } else {
-      // New player needs to join
       setShowJoinModal(true)
-    }
-
-    // Load view preferences
-    const savedViewMode = localStorage.getItem(`crdt-cards-viewmode-${getRoomName()}`)
-    if (savedViewMode === 'grid' || savedViewMode === 'focused') {
-      setViewMode(savedViewMode)
     }
 
     // Subscribe to WebRTC connection status
@@ -79,16 +68,12 @@ function App() {
 
     const handleSynced = (event: { synced: boolean }) => {
       setSynced(event.synced)
-      // After sync, attempt to rejoin if we have a saved player ID
       if (event.synced && savedPlayerId && !currentPlayerId) {
         if (playersMap.has(savedPlayerId)) {
-          // Player still exists in the room - rejoin automatically
           setCurrentPlayerId(savedPlayerId)
-          setSelectedPlayerId(savedPlayerId)
           setShowJoinModal(false)
           console.log('Rejoined as existing player:', savedPlayerId)
         }
-        // If player doesn't exist, join modal is already shown
       }
     }
 
@@ -102,7 +87,7 @@ function App() {
         const player = playersMap.get(baton.playerId)
         setCurrentTurn(`${player?.name || baton.playerId} - ${baton.step}`)
       }
-      forceUpdate({}) // Force re-render
+      forceUpdate({})
     }
 
     playersMap.observe(updateUI)
@@ -110,7 +95,6 @@ function App() {
     cardsMap.observe(updateUI)
     batonMap.observe(updateUI)
 
-    // Initial update
     updateUI()
 
     return () => {
@@ -121,27 +105,22 @@ function App() {
       provider.off('status', handleStatus)
       provider.off('synced', handleSynced)
     }
-  }, [])
+  }, [currentPlayerId])
 
   const handleJoin = async (name: string, deckId: string) => {
     const playerId = crypto.randomUUID()
-
-    // Skip sample cards when joining with a deck
     addPlayer(playerId, name, true)
 
-    // Check if it's a starter deck or user deck
     const starterDeck = STARTER_DECKS.find(d => d.id === deckId)
 
     if (starterDeck) {
-      // Import starter deck from local file
       const result = await importFromLocalFile(starterDeck.file, starterDeck.name)
       if (result.success && result.deck) {
         applyDeckToPlayer(playerId, result.deck)
-        setLastUsedDeckId(result.deck.id) // Save the imported deck ID, not starter ID
+        setLastUsedDeckId(result.deck.id)
         drawCards(playerId, 7)
       }
     } else {
-      // Use existing user deck
       const decks = getStoredDecks()
       const deck = decks.find(d => d.id === deckId)
       if (deck) {
@@ -151,18 +130,13 @@ function App() {
       }
     }
 
-    // Save player ID to room-specific localStorage
     const storageKey = `crdt-cards-player-${getRoomName()}`
     localStorage.setItem(storageKey, playerId)
-
-    // Save username globally for reuse across rooms
     localStorage.setItem('crdt-cards-username', name)
 
     setCurrentPlayerId(playerId)
-    setSelectedPlayerId(playerId)
     setShowJoinModal(false)
 
-    // Set initial turn to first player if not set
     if (!getTurnBaton() && playersMap.size === 1) {
       setTurnBaton(playerId, 'main1')
     }
@@ -185,18 +159,11 @@ function App() {
       onConfirm: () => {
         removePlayer(playerId)
 
-        // If removing yourself, clear localStorage and rejoin
         if (playerId === currentPlayerId) {
           const storageKey = `crdt-cards-player-${getRoomName()}`
           localStorage.removeItem(storageKey)
           setCurrentPlayerId(null)
-          setSelectedPlayerId(null)
           setShowJoinModal(true)
-        }
-
-        // If viewing removed player, switch to current player
-        if (playerId === selectedPlayerId && currentPlayerId) {
-          setSelectedPlayerId(currentPlayerId)
         }
 
         setConfirmDialog(null)
@@ -206,27 +173,16 @@ function App() {
 
   const handleResetRoom = () => {
     setConfirmDialog({
-      message: 'Reset the entire room? This will clear all players, cards, and game state. This cannot be undone.',
+      message: 'Reset the entire room? This will clear all players, cards, and game state.',
       onConfirm: () => {
         resetRoom()
-
-        // Clear localStorage for this room
         const storageKey = `crdt-cards-player-${getRoomName()}`
         localStorage.removeItem(storageKey)
-
-        // Reload page to fresh state
         window.location.reload()
       },
     })
   }
 
-  const toggleViewMode = () => {
-    const newMode: ViewMode = viewMode === 'focused' ? 'grid' : 'focused'
-    setViewMode(newMode)
-    localStorage.setItem(`crdt-cards-viewmode-${getRoomName()}`, newMode)
-  }
-
-  // Get cards for a specific zone
   const getZoneCards = (zoneId: string): Array<{ id: string; card: CardType }> => {
     const cards: Array<{ id: string; card: CardType }> = []
     cardsMap.forEach((card, id) => {
@@ -237,18 +193,6 @@ function App() {
     return cards.sort((a, b) => a.card.order - b.card.order)
   }
 
-  // Get zones for a player
-  const getPlayerZones = (playerId: string): Array<{ id: string; zone: ZoneType }> => {
-    const zones: Array<{ id: string; zone: ZoneType }> = []
-    zonesMap.forEach((zone, id) => {
-      if (zone.owner === playerId) {
-        zones.push({ id, zone })
-      }
-    })
-    return zones
-  }
-
-  // Get all players as array
   const players: Array<{ id: string; player: Player }> = []
   playersMap.forEach((player, id) => {
     players.push({ id, player })
@@ -263,395 +207,245 @@ function App() {
   }
 
   const currentPlayer = playersMap.get(currentPlayerId)
-  const viewedPlayerId = selectedPlayerId || currentPlayerId
+  const displayedPlayerId = viewingOpponentId || currentPlayerId
 
   return (
     <div
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        backgroundColor: '#e0e0e0',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+        backgroundColor: '#e0e0e0',
       }}
     >
-      {/* Header */}
+      {/* Header - Compact */}
       <div
         style={{
           backgroundColor: '#fff',
-          padding: '1rem',
+          padding: '0.75rem 1rem',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem' }}>CRDT Cards</h1>
-            <div style={{ fontSize: '0.875rem' }}>
-              <strong>You:</strong> {currentPlayer?.name || 'Unknown'}
-              {currentTurn && (
-                <>
-                  {' | '}
-                  <strong>Turn:</strong> {currentTurn}
-                </>
-              )}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>CRDT Cards</h1>
+          <div style={{ fontSize: '0.75rem', color: '#666' }}>
+            {currentPlayer?.name}
+            {currentTurn && ` | ${currentTurn}`}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={toggleViewMode}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: 'bold',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              {viewMode === 'focused' ? '⊞ Grid View' : '⊡ Focused View'}
-            </button>
-            <button
-              onClick={handleNextTurn}
-              disabled={players.length === 0}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: 'bold',
-                backgroundColor: players.length > 0 ? '#9C27B0' : '#ccc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: players.length > 0 ? 'pointer' : 'not-allowed',
-              }}
-            >
-              Next Turn
-            </button>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                color: connected && synced ? '#4CAF50' : '#FF9800',
-                fontSize: '0.75rem',
-              }}
-            >
-              <span
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: connected && synced ? '#4CAF50' : '#FF9800',
-                }}
-              />
-              {connected && synced ? 'Connected' : connected ? 'Syncing...' : 'Connecting...'}
-            </div>
-            <button
-              onClick={handleResetRoom}
-              style={{
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                color: 'white',
-                backgroundColor: '#F44336',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Reset Room
-            </button>
-          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            onClick={handleNextTurn}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Next Turn
+          </button>
+          <div
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: connected && synced ? '#4CAF50' : '#FF9800',
+            }}
+          />
+          <button
+            onClick={handleResetRoom}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              backgroundColor: '#F44336',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Reset
+          </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      {viewMode === 'focused' ? (
-        // Focused Mode Layout
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Player Rail */}
-          <div
-            style={{
-              width: '200px',
-              backgroundColor: '#fff',
-              boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-              padding: '1rem',
-              overflowY: 'auto',
-            }}
-          >
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: '#666' }}>
-              PLAYERS ({players.length}/4)
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {players.map(({ id, player }) => (
-                <div key={id}>
-                  <div
-                    onClick={() => setSelectedPlayerId(id)}
+      {/* Opponent Bar */}
+      <OpponentBar
+        players={players}
+        currentPlayerId={currentPlayerId}
+        onSelectPlayer={setViewingOpponentId}
+      />
+
+      {/* Main Content Area - Battlefield + Hand + Bottom Bar */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Battlefield - Takes most space */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
+          <Zone
+            zoneId={`battlefield-${displayedPlayerId}`}
+            zoneName="Battlefield"
+            zoneType="battlefield"
+            cards={getZoneCards(`battlefield-${displayedPlayerId}`)}
+            playerColor={getPlayerColor(displayedPlayerId)}
+            playerId={displayedPlayerId}
+            isInteractive={displayedPlayerId === currentPlayerId}
+            viewerPlayerId={currentPlayerId}
+          />
+        </div>
+
+        {/* Bottom Control Strip - Hand + Deck + Life/Buttons Column */}
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: '2px solid #ddd',
+            backgroundColor: '#f5f5f5',
+            padding: '0.75rem 1rem',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto auto',
+            gap: '1rem',
+            alignItems: 'center',
+          }}
+        >
+          {/* Hand Zone */}
+          <div style={{ minWidth: 0 }}>
+            <Zone
+              zoneId={`hand-${displayedPlayerId}`}
+              zoneName="Hand"
+              zoneType="hand"
+              cards={getZoneCards(`hand-${displayedPlayerId}`)}
+              playerColor={getPlayerColor(displayedPlayerId)}
+              playerId={displayedPlayerId}
+              isInteractive={displayedPlayerId === currentPlayerId}
+              viewerPlayerId={currentPlayerId}
+            />
+          </div>
+
+          {/* Control Panel - Only show for current player */}
+          {currentPlayer && displayedPlayerId === currentPlayerId && (
+            <>
+              {/* Deck */}
+              <CompactDeck
+                cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
+                playerColor={getPlayerColor(displayedPlayerId)}
+                onDrawOne={() => drawCards(displayedPlayerId, 1)}
+                onDrawN={(count) => drawCards(displayedPlayerId, count)}
+                onMillOne={() => millCards(displayedPlayerId, 1)}
+                onMillN={(count) => millCards(displayedPlayerId, count)}
+                onExileOne={() => exileFromDeck(displayedPlayerId, 1)}
+                onShuffle={() => shuffleDeck(displayedPlayerId)}
+              />
+
+              {/* Life Counter + Buttons Column */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                {/* Life Counter */}
+                <CompactLifeCounter
+                  playerId={displayedPlayerId}
+                  lifeTotal={currentPlayer.lifeTotal}
+                  playerColor={getPlayerColor(displayedPlayerId)}
+                  currentPlayerId={currentPlayerId}
+                />
+
+                {/* Buttons Row */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {/* Graveyard/Exile Button */}
+                  <button
+                    onClick={() => setIsDrawerOpen(!isDrawerOpen)}
                     style={{
-                      padding: '0.75rem',
-                      backgroundColor: id === viewedPlayerId ? getPlayerColor(id) : '#f5f5f5',
-                      color: id === viewedPlayerId ? 'white' : '#333',
+                      width: '75px',
+                      height: '40px',
                       borderRadius: '6px',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      fontSize: '1.25rem',
                       cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: id === viewedPlayerId ? 'bold' : 'normal',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={(e) => {
-                      if (id !== viewedPlayerId) {
-                        e.currentTarget.style.backgroundColor = '#e0e0e0'
-                      }
+                      e.currentTarget.style.backgroundColor = '#1976D2'
                     }}
                     onMouseLeave={(e) => {
-                      if (id !== viewedPlayerId) {
-                        e.currentTarget.style.backgroundColor = '#f5f5f5'
-                      }
+                      e.currentTarget.style.backgroundColor = '#2196F3'
                     }}
+                    title="Graveyard & Exile"
                   >
-                    <span>
-                      {player.name}
-                      {id === currentPlayerId && ' (You)'}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRemovePlayer(id, player.name)
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: id === viewedPlayerId ? 'white' : '#666',
-                        cursor: 'pointer',
-                        fontSize: '1.2rem',
-                        lineHeight: 1,
-                        padding: '0 0.25rem',
-                        opacity: 0.7,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '1'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '0.7'
-                      }}
-                      title={`Remove ${player.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {currentPlayerId && (
-                    <LifeCounter
-                      playerId={id}
+                    📜
+                  </button>
 
-                      lifeTotal={player.lifeTotal}
-                      playerColor={getPlayerColor(id)}
-                      currentPlayerId={currentPlayerId}
-                      compact={true}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            {currentPlayerId !== viewedPlayerId && (
-              <button
-                onClick={() => setSelectedPlayerId(currentPlayerId)}
-                style={{
-                  marginTop: '1rem',
-                  padding: '0.5rem',
-                  width: '100%',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                ← My Board
-              </button>
-            )}
-          </div>
-
-          {/* Main Stage */}
-          <div style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-            {players.find(p => p.id === viewedPlayerId) && (
-              <div
-                style={{
-                  backgroundColor: '#fff',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                }}
-              >
-                <h2
-                  style={{
-                    margin: '0 0 1rem 0',
-                    color: getPlayerColor(viewedPlayerId),
-                    borderBottom: `3px solid ${getPlayerColor(viewedPlayerId)}`,
-                    paddingBottom: '0.5rem',
-                  }}
-                >
-                  {playersMap.get(viewedPlayerId)?.name || 'Unknown'}
-                  {viewedPlayerId === currentPlayerId && ' (You)'}
-                </h2>
-                {getPlayerZones(viewedPlayerId).map(({ id: zoneId, zone }) => (
-                  <Zone
-                    key={zoneId}
-                    zoneId={zoneId}
-                    zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
-                    zoneType={zone.type}
-                    cards={getZoneCards(zoneId)}
-                    playerColor={getPlayerColor(viewedPlayerId)}
-                    playerId={viewedPlayerId}
-                    onDrawCards={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => drawCards(viewedPlayerId, count) : undefined}
-                    onMillCards={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => millCards(viewedPlayerId, count) : undefined}
-                    onExileFromDeck={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? (count) => exileFromDeck(viewedPlayerId, count) : undefined}
-                    onShuffleDeck={zone.type === 'deck' && viewedPlayerId === currentPlayerId ? () => shuffleDeck(viewedPlayerId) : undefined}
-                    isInteractive={viewedPlayerId === currentPlayerId}
-                    viewerPlayerId={currentPlayerId}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Chat Log Sidebar */}
-          <div
-            style={{
-              width: '300px',
-              backgroundColor: '#fff',
-              boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-            }}
-          >
-            <ChatLog currentPlayerId={currentPlayerId} />
-          </div>
-        </div>
-      ) : (
-        // Grid Mode Layout
-        <div style={{ flex: 1, padding: '1rem', overflow: 'auto' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: players.length === 1 ? '1fr' : players.length === 2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)',
-              gridTemplateRows: players.length <= 2 ? '1fr' : 'repeat(2, 1fr)',
-              gap: '1rem',
-              height: players.length <= 2 ? '100%' : 'calc(100vh - 150px)',
-            }}
-          >
-            {players.map(({ id, player }) => {
-              const zones = getPlayerZones(id)
-              const playerColor = getPlayerColor(id)
-              const isCurrentPlayer = id === currentPlayerId
-
-              return (
-                <div
-                  key={id}
-                  style={{
-                    backgroundColor: '#fff',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    overflow: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  <h2
+                  {/* Chat Button */}
+                  <button
+                    onClick={() => setIsChatOpen(!isChatOpen)}
                     style={{
-                      margin: '0 0 1rem 0',
-                      color: playerColor,
-                      borderBottom: `3px solid ${playerColor}`,
-                      paddingBottom: '0.5rem',
+                      width: '75px',
+                      height: '40px',
+                      borderRadius: '6px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
                       fontSize: '1.25rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transition: 'all 0.2s',
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#388E3C'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#4CAF50'
+                    }}
+                    title="Chat & Log"
                   >
-                    <span>
-                      {player.name}
-                      {id === currentPlayerId && ' (You)'}
-                    </span>
-                    <button
-                      onClick={() => handleRemovePlayer(id, player.name)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: playerColor,
-                        cursor: 'pointer',
-                        fontSize: '1.2rem',
-                        lineHeight: 1,
-                        padding: '0 0.25rem',
-                        opacity: 0.7,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '1'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '0.7'
-                      }}
-                      title={`Remove ${player.name}`}
-                    >
-                      ×
-                    </button>
-                  </h2>
-                  {currentPlayerId && (
-                    <LifeCounter
-                      playerId={id}
-                      // removed playerName prop
-                      lifeTotal={player.lifeTotal}
-                      playerColor={playerColor}
-                      currentPlayerId={currentPlayerId}
-                      compact={false}
-                    />
-                  )}
-                  <div style={{ flex: 1, overflow: 'auto' }}>
-                    {zones.map(({ id: zoneId, zone }) => (
-                      <Zone
-                        key={zoneId}
-                        zoneId={zoneId}
-                        zoneName={zone.type.charAt(0).toUpperCase() + zone.type.slice(1)}
-                        zoneType={zone.type}
-                        cards={getZoneCards(zoneId)}
-                        playerColor={playerColor}
-                        playerId={id}
-                        onDrawCards={zone.type === 'deck' && isCurrentPlayer ? (count) => drawCards(id, count) : undefined}
-                        onMillCards={zone.type === 'deck' && isCurrentPlayer ? (count) => millCards(id, count) : undefined}
-                        onExileFromDeck={zone.type === 'deck' && isCurrentPlayer ? (count) => exileFromDeck(id, count) : undefined}
-                        onShuffleDeck={zone.type === 'deck' && isCurrentPlayer ? () => shuffleDeck(id) : undefined}
-                        isInteractive={isCurrentPlayer}
-                        viewerPlayerId={currentPlayerId}
-                      />
-                    ))}
-                  </div>
+                    💬
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Info Footer */}
-      {players.length < 4 && (
-        <div
-          style={{
-            padding: '1rem',
-            backgroundColor: '#fff',
-            boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',
-            fontSize: '0.875rem',
-            color: '#666',
-            textAlign: 'center',
-          }}
-        >
-          <strong>💡 Waiting for players...</strong>
-          <br />
-          Share this URL: <code style={{ backgroundColor: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>{window.location.href}</code>
-        </div>
-      )}
+      {/* Overlays */}
+      <ChatOverlay
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        currentPlayerId={currentPlayerId}
+      />
+
+      <ZoneDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        graveyardCards={getZoneCards(`graveyard-${displayedPlayerId}`)}
+        exileCards={getZoneCards(`exile-${displayedPlayerId}`)}
+        playerColor={getPlayerColor(displayedPlayerId)}
+        playerId={displayedPlayerId}
+        isInteractive={displayedPlayerId === currentPlayerId}
+        viewerPlayerId={currentPlayerId}
+      />
 
       {confirmDialog && (
         <ConfirmDialog

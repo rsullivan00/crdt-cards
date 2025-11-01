@@ -326,25 +326,6 @@ export function Card({
           </div>
         )}
 
-        {card.tapped && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: 'rgba(255, 87, 34, 0.9)',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '0.7rem',
-              fontWeight: 'bold',
-              pointerEvents: 'none',
-            }}
-          >
-            ⭯ TAPPED
-          </div>
-        )}
 
         {/* Move button */}
         {isInteractive && (
