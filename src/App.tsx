@@ -289,7 +289,7 @@ function App() {
         onSelectPlayer={setViewingOpponentId}
       />
 
-      {/* Main Content Area - Battlefield + Hand + Bottom Bar */}
+      {/* Main Content Area - Battlefield + Panels + Hand + Bottom Bar */}
       <div
         style={{
           flex: 1,
@@ -299,8 +299,8 @@ function App() {
           flexDirection: 'column',
         }}
       >
-        {/* Battlefield - Takes most space */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
+        {/* Battlefield - Takes remaining space */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '1rem', minHeight: 0 }}>
           <Zone
             zoneId={`battlefield-${displayedPlayerId}`}
             zoneName="Battlefield"
@@ -312,6 +312,28 @@ function App() {
             viewerPlayerId={currentPlayerId}
           />
         </div>
+
+        {/* Graveyard Expansion Panel */}
+        <GraveyardOverlay
+          isOpen={isGraveyardOpen}
+          onClose={() => setIsGraveyardOpen(false)}
+          cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
+          playerColor={getPlayerColor(displayedPlayerId)}
+          playerId={displayedPlayerId}
+          isInteractive={displayedPlayerId === currentPlayerId}
+          viewerPlayerId={currentPlayerId}
+        />
+
+        {/* Exile Expansion Panel */}
+        <ExileOverlay
+          isOpen={isExileOpen}
+          onClose={() => setIsExileOpen(false)}
+          cards={getZoneCards(`exile-${displayedPlayerId}`)}
+          playerColor={getPlayerColor(displayedPlayerId)}
+          playerId={displayedPlayerId}
+          isInteractive={displayedPlayerId === currentPlayerId}
+          viewerPlayerId={currentPlayerId}
+        />
 
         {/* Bottom Control Strip - Hand + Deck + Life/Buttons Column */}
         <div
@@ -457,31 +479,11 @@ function App() {
         </div>
       </div>
 
-      {/* Overlays */}
+      {/* Chat Overlay - Still a modal */}
       <ChatOverlay
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         currentPlayerId={currentPlayerId}
-      />
-
-      <GraveyardOverlay
-        isOpen={isGraveyardOpen}
-        onClose={() => setIsGraveyardOpen(false)}
-        cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
-        playerColor={getPlayerColor(displayedPlayerId)}
-        playerId={displayedPlayerId}
-        isInteractive={displayedPlayerId === currentPlayerId}
-        viewerPlayerId={currentPlayerId}
-      />
-
-      <ExileOverlay
-        isOpen={isExileOpen}
-        onClose={() => setIsExileOpen(false)}
-        cards={getZoneCards(`exile-${displayedPlayerId}`)}
-        playerColor={getPlayerColor(displayedPlayerId)}
-        playerId={displayedPlayerId}
-        isInteractive={displayedPlayerId === currentPlayerId}
-        viewerPlayerId={currentPlayerId}
       />
 
       {confirmDialog && (

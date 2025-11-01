@@ -20,115 +20,70 @@ export function ExileOverlay({
   isInteractive,
   viewerPlayerId,
 }: ExileOverlayProps) {
-  if (!isOpen) return null
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          zIndex: 999,
-          animation: 'fadeIn 0.2s ease',
-        }}
-      />
-
-      {/* Overlay Panel */}
+    <div
+      style={{
+        height: isOpen ? '200px' : '0',
+        overflow: 'hidden',
+        transition: 'height 0.3s ease',
+        flexShrink: 0,
+        backgroundColor: '#fff',
+        borderTop: isOpen ? '2px solid #9C27B0' : 'none',
+      }}
+    >
+      {/* Header */}
       <div
         style={{
-          position: 'fixed',
-          left: '50%',
-          bottom: '220px',
-          transform: 'translateX(-50%)',
-          width: '80%',
-          maxWidth: '1200px',
-          maxHeight: '400px',
-          backgroundColor: '#fff',
-          boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.3)',
-          zIndex: 1000,
+          padding: '0.5rem 1rem',
+          borderBottom: '2px solid #ddd',
           display: 'flex',
-          flexDirection: 'column',
-          borderRadius: '8px',
-          animation: 'slideInUp 0.3s ease',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#f9f9f9',
         }}
       >
-        {/* Header */}
-        <div
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>🚫 Exile</h3>
+        <button
+          onClick={onClose}
           style={{
-            padding: '1rem',
-            borderBottom: '2px solid #ddd',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: '#f9f9f9',
-            borderRadius: '8px 8px 0 0',
+            background: 'none',
+            border: 'none',
+            fontSize: '1.25rem',
+            cursor: 'pointer',
+            color: '#666',
+            padding: '0.25rem',
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#333'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#666'
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '1.25rem' }}>🚫 Exile</h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#666',
-              padding: '0.25rem',
-              lineHeight: 1,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#333'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#666'
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Zone Content */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '1rem',
-          }}
-        >
-          <Zone
-            zoneId={`exile-${playerId}`}
-            zoneName="Exile"
-            zoneType="exile"
-            cards={cards}
-            playerColor={playerColor}
-            playerId={playerId}
-            isInteractive={isInteractive}
-            viewerPlayerId={viewerPlayerId}
-          />
-        </div>
+          ×
+        </button>
       </div>
 
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideInUp {
-          from {
-            transform: translateX(-50%) translateY(100%);
-          }
-          to {
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-      `}</style>
-    </>
+      {/* Zone Content */}
+      <div
+        style={{
+          height: 'calc(200px - 48px)',
+          overflow: 'auto',
+          padding: '0.5rem',
+        }}
+      >
+        <Zone
+          zoneId={`exile-${playerId}`}
+          zoneName="Exile"
+          zoneType="exile"
+          cards={cards}
+          playerColor={playerColor}
+          playerId={playerId}
+          isInteractive={isInteractive}
+          viewerPlayerId={viewerPlayerId}
+        />
+      </div>
+    </div>
   )
 }
