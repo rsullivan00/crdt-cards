@@ -29,7 +29,8 @@ import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { OpponentBar } from './OpponentBar'
 import { ChatOverlay } from './ChatOverlay'
-import { ZoneDrawer } from './ZoneDrawer'
+import { GraveyardOverlay } from './GraveyardOverlay'
+import { ExileOverlay } from './ExileOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 
@@ -47,7 +48,8 @@ function App() {
 
   // New UI state
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isGraveyardOpen, setIsGraveyardOpen] = useState(false)
+  const [isExileOpen, setIsExileOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -371,14 +373,14 @@ function App() {
 
                 {/* Buttons Row */}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {/* Graveyard/Exile Button */}
+                  {/* Graveyard Button */}
                   <button
-                    onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                    onClick={() => setIsGraveyardOpen(!isGraveyardOpen)}
                     style={{
-                      width: '75px',
+                      width: '50px',
                       height: '40px',
                       borderRadius: '6px',
-                      backgroundColor: '#2196F3',
+                      backgroundColor: '#757575',
                       color: 'white',
                       border: 'none',
                       fontSize: '1.25rem',
@@ -387,21 +389,47 @@ function App() {
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#1976D2'
+                      e.currentTarget.style.backgroundColor = '#616161'
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#2196F3'
+                      e.currentTarget.style.backgroundColor = '#757575'
                     }}
-                    title="Graveyard & Exile"
+                    title="Graveyard"
                   >
-                    📜
+                    💀
+                  </button>
+
+                  {/* Exile Button */}
+                  <button
+                    onClick={() => setIsExileOpen(!isExileOpen)}
+                    style={{
+                      width: '50px',
+                      height: '40px',
+                      borderRadius: '6px',
+                      backgroundColor: '#9C27B0',
+                      color: 'white',
+                      border: 'none',
+                      fontSize: '1.25rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#7B1FA2'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#9C27B0'
+                    }}
+                    title="Exile"
+                  >
+                    🚫
                   </button>
 
                   {/* Chat Button */}
                   <button
                     onClick={() => setIsChatOpen(!isChatOpen)}
                     style={{
-                      width: '75px',
+                      width: '50px',
                       height: '40px',
                       borderRadius: '6px',
                       backgroundColor: '#4CAF50',
@@ -436,11 +464,20 @@ function App() {
         currentPlayerId={currentPlayerId}
       />
 
-      <ZoneDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        graveyardCards={getZoneCards(`graveyard-${displayedPlayerId}`)}
-        exileCards={getZoneCards(`exile-${displayedPlayerId}`)}
+      <GraveyardOverlay
+        isOpen={isGraveyardOpen}
+        onClose={() => setIsGraveyardOpen(false)}
+        cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
+        playerColor={getPlayerColor(displayedPlayerId)}
+        playerId={displayedPlayerId}
+        isInteractive={displayedPlayerId === currentPlayerId}
+        viewerPlayerId={currentPlayerId}
+      />
+
+      <ExileOverlay
+        isOpen={isExileOpen}
+        onClose={() => setIsExileOpen(false)}
+        cards={getZoneCards(`exile-${displayedPlayerId}`)}
         playerColor={getPlayerColor(displayedPlayerId)}
         playerId={displayedPlayerId}
         isInteractive={displayedPlayerId === currentPlayerId}
