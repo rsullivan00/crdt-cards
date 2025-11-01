@@ -290,9 +290,9 @@ export function Zone({
         style={{
           backgroundColor: isDragOver ? '#e3f2fd' : '#f5f5f5',
           borderRadius: '8px',
-          padding: '1rem',
-          marginBottom: '1rem',
-          minHeight: '400px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
           border: isDragOver ? '2px dashed #2196F3' : '2px solid transparent',
           transition: 'all 0.2s ease',
           position: 'relative', // Important for absolute positioning of cards
@@ -307,7 +307,9 @@ export function Zone({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '0.75rem',
+            padding: '0.5rem 1rem',
+            marginBottom: '0.5rem',
+            flexShrink: 0,
           }}
         >
           <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
@@ -332,7 +334,8 @@ export function Zone({
           ref={battlefieldRef}
           style={{
             position: 'relative',
-            minHeight: '340px',
+            flex: 1,
+            minHeight: 0,
           }}
         >
           {cards.length === 0 ? (
@@ -380,10 +383,12 @@ export function Zone({
         backgroundColor: isDragOver ? '#e3f2fd' : '#f5f5f5',
         borderRadius: '8px',
         padding: '1rem',
+        paddingTop: '1.5rem',
         marginBottom: '1rem',
         minHeight: '200px',
         border: isDragOver ? '2px dashed #2196F3' : '2px solid transparent',
         transition: 'all 0.2s ease',
+        overflow: 'visible',
       }}
       data-zone-id={zoneId}
       onDragOver={handleDragOver}
@@ -422,6 +427,7 @@ export function Zone({
           display: 'flex',
           flexWrap: 'nowrap',
           overflowX: 'auto',
+          overflowY: 'visible',
           minHeight: '160px',
           alignItems: 'flex-start',
           paddingBottom: '0.5rem',
@@ -453,6 +459,7 @@ export function Zone({
                   position: 'relative',
                   zIndex: index,
                   transition: 'all 0.2s ease',
+                  isolation: 'auto',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.zIndex = '999'

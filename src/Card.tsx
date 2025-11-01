@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, setCardPosition } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
@@ -35,6 +36,7 @@ export function Card({
 }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [counterModal, setCounterModal] = useState<{
     type: 'set' | 'add'
     counterType?: string
@@ -43,6 +45,7 @@ export function Card({
   const [isDragging, setIsDragging] = useState(false)
   const [localPosition, setLocalPosition] = useState<{ x: number; y: number } | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Determine if this card is in battlefield zone
@@ -132,18 +135,30 @@ export function Card({
     fontWeight: 'bold',
   }
 
-  const menuStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    backgroundColor: 'white',
-    border: '2px solid #333',
-    borderRadius: '6px',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-    zIndex: 100,
-    minWidth: '150px',
-    marginTop: '4px',
-  }
+  const menuStyle: React.CSSProperties = menuPosition
+    ? {
+        position: 'fixed',
+        top: `${menuPosition.top}px`,
+        left: `${menuPosition.left}px`,
+        backgroundColor: 'white',
+        border: '2px solid #333',
+        borderRadius: '6px',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+        zIndex: 9999,
+        minWidth: '150px',
+      }
+    : {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        border: '2px solid #333',
+        borderRadius: '6px',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+        zIndex: 9999,
+        minWidth: '150px',
+      }
 
   const menuItemStyle: React.CSSProperties = {
     padding: '0.5rem 0.75rem',
@@ -330,8 +345,32 @@ export function Card({
         {/* Move button */}
         {isInteractive && (
           <button
+            ref={menuButtonRef}
             onClick={(e) => {
               e.stopPropagation()
+              if (!showMenu && menuButtonRef.current) {
+                const rect = menuButtonRef.current.getBoundingClientRect()
+                const viewportHeight = window.innerHeight
+                const viewportWidth = window.innerWidth
+
+                // Calculate position - place to the right of button
+                let left = rect.right + 8
+                let top = rect.top
+
+                // If menu would go off right edge, place to the left instead
+                const menuWidth = 150
+                if (left + menuWidth > viewportWidth) {
+                  left = rect.left - menuWidth - 8
+                }
+
+                // If menu would go off bottom, adjust upward
+                const menuHeight = 150
+                if (top + menuHeight > viewportHeight) {
+                  top = Math.max(8, viewportHeight - menuHeight - 8)
+                }
+
+                setMenuPosition({ top, left })
+              }
               setShowMenu(!showMenu)
             }}
             style={{
@@ -353,8 +392,8 @@ export function Card({
         )}
       </div>
 
-      {/* Movement menu */}
-      {isInteractive && showMenu && (
+      {/* Movement menu - rendered via portal to escape container boundaries */}
+      {isInteractive && showMenu && createPortal(
         <>
           {/* Backdrop to close menu */}
           <div
@@ -364,7 +403,7 @@ export function Card({
               left: 0,
               right: 0,
               bottom: 0,
-              zIndex: 99,
+              zIndex: 9998,
             }}
             onClick={() => setShowMenu(false)}
           />
@@ -669,7 +708,8 @@ export function Card({
               </button>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {/* Counter Modals */}

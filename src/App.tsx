@@ -300,7 +300,7 @@ function App() {
         }}
       >
         {/* Battlefield - Takes remaining space */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '1rem', minHeight: 0 }}>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <Zone
             zoneId={`battlefield-${displayedPlayerId}`}
             zoneName="Battlefield"
@@ -349,7 +349,7 @@ function App() {
           }}
         >
           {/* Hand Zone */}
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, overflow: 'visible' }}>
             <Zone
               zoneId={`hand-${displayedPlayerId}`}
               zoneName="Hand"

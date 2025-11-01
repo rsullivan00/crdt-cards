@@ -71,7 +71,7 @@ export function ExileOverlay({
       <div
         style={{
           height: 'calc(200px - 48px)',
-          overflow: 'auto',
+          overflow: 'visible',
           padding: '0.5rem',
         }}
       >
