@@ -178,11 +178,26 @@ export function Card({
     isDraggingAnyCard = true
     onDragStateChange?.()
 
+    // Calculate where on the card the user clicked (offset from top-left)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetX = e.clientX - rect.left
+    const offsetY = e.clientY - rect.top
+
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('cardId', cardId)
     e.dataTransfer.setData('fromZoneId', card.zoneId)
     e.dataTransfer.setData('playerId', playerId)
     e.dataTransfer.setData('order', card.order.toString())
+    e.dataTransfer.setData('dragOffsetX', offsetX.toString())
+    e.dataTransfer.setData('dragOffsetY', offsetY.toString())
+
+    // Set custom drag image with the same offset for better visual feedback
+    try {
+      e.dataTransfer.setDragImage(e.currentTarget, offsetX, offsetY)
+    } catch (err) {
+      // setDragImage can fail in some browsers, ignore errors
+      console.warn('Could not set custom drag image:', err)
+    }
   }
 
   const handleDragEnd = () => {

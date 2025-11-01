@@ -66,8 +66,15 @@ export function Zone({
     // For battlefield zone, calculate drop position
     if (zoneType === 'battlefield' && battlefieldRef.current) {
       const rect = battlefieldRef.current.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+
+      // Get the drag offset (where on the card the user clicked)
+      const offsetX = parseFloat(e.dataTransfer.getData('dragOffsetX') || '0')
+      const offsetY = parseFloat(e.dataTransfer.getData('dragOffsetY') || '0')
+
+      // Calculate position accounting for where the user grabbed the card
+      // This makes the card appear exactly where the drag preview showed it
+      const x = e.clientX - rect.left - offsetX
+      const y = e.clientY - rect.top - offsetY
 
       // If dropping from a different zone, move card first then set position
       if (fromZoneId !== zoneId) {
