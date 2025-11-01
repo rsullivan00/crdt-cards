@@ -363,7 +363,17 @@ export function Zone({
     )
   }
 
-  // Regular zones (hand, graveyard, exile) with flex layout
+  // Calculate overlap based on card count
+  const calculateCardSpacing = (cardCount: number): number => {
+    if (cardCount <= 5) return 100 // No overlap, full spacing
+    if (cardCount <= 10) return 80 // Slight overlap (20% overlap)
+    if (cardCount <= 15) return 60 // Medium overlap (40% overlap)
+    return 50 // Tight overlap (50% overlap - minimum)
+  }
+
+  const cardSpacing = calculateCardSpacing(cards.length)
+
+  // Regular zones (hand, graveyard, exile) with overlapping card layout
   return (
     <div
       style={{
@@ -410,10 +420,11 @@ export function Zone({
       <div
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
+          flexWrap: 'nowrap',
+          overflowX: 'auto',
           minHeight: '160px',
           alignItems: 'flex-start',
+          paddingBottom: '0.5rem',
         }}
       >
         {cards.length === 0 ? (
@@ -428,22 +439,39 @@ export function Zone({
             No cards in this zone
           </div>
         ) : (
-          cards.map(({ id, card }) => {
+          cards.map(({ id, card }, index) => {
             const shouldHideCard =
               zoneType === 'hand' &&
               !!viewerPlayerId &&
               playerId !== viewerPlayerId
 
             return (
-              <CardComponent
+              <div
                 key={id}
-                cardId={id}
-                card={card}
-
-                playerId={playerId}
-                isInteractive={isInteractive}
-                forceFaceDown={shouldHideCard}
-              />
+                style={{
+                  marginLeft: index === 0 ? '0' : `-${100 - cardSpacing}px`,
+                  position: 'relative',
+                  zIndex: index,
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.zIndex = '999'
+                  e.currentTarget.style.transform = 'translateY(-10px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.zIndex = String(index)
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <CardComponent
+                  key={id}
+                  cardId={id}
+                  card={card}
+                  playerId={playerId}
+                  isInteractive={isInteractive}
+                  forceFaceDown={shouldHideCard}
+                />
+              </div>
             )
           })
         )}
