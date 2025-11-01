@@ -42,7 +42,9 @@ export function ExileOverlay({
           backgroundColor: '#f9f9f9',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>🚫 Exile</h3>
+        <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>
+          🚫 Exile ({cards.length} {cards.length === 1 ? 'card' : 'cards'})
+        </h3>
         <button
           onClick={onClose}
           style={{
@@ -75,13 +77,14 @@ export function ExileOverlay({
       >
         <Zone
           zoneId={`exile-${playerId}`}
-          zoneName="Exile"
+          zoneName=""
           zoneType="exile"
           cards={cards}
           playerColor={playerColor}
           playerId={playerId}
           isInteractive={isInteractive}
           viewerPlayerId={viewerPlayerId}
+          showHeader={false}
         />
       </div>
     </div>

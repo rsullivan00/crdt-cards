@@ -16,6 +16,7 @@ interface ZoneProps {
   isInteractive?: boolean
   viewerPlayerId?: string
   zoneId: string
+  showHeader?: boolean
 }
 
 export function Zone({
@@ -31,6 +32,7 @@ export function Zone({
   isInteractive = true,
   viewerPlayerId,
   zoneId,
+  showHeader = true,
 }: ZoneProps) {
   const [numberModal, setNumberModal] = useState<{
     title: string
@@ -378,30 +380,32 @@ export function Zone({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '0.75rem',
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
-          {zoneName}
-        </h3>
-        <span
+      {showHeader && (
+        <div
           style={{
-            backgroundColor: playerColor,
-            color: 'white',
-            padding: '0.25rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 'bold',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
           }}
         >
-          {cards.length} cards
-        </span>
-      </div>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
+            {zoneName}
+          </h3>
+          <span
+            style={{
+              backgroundColor: playerColor,
+              color: 'white',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+            }}
+          >
+            {cards.length} cards
+          </span>
+        </div>
+      )}
 
       <div
         style={{
