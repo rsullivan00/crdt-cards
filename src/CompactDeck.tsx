@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom'
 import { NumberInputModal } from './NumberInputModal'
 import { ScryPeekModal } from './ScryPeekModal'
 import { Card, getTopCards, reorderTopCards } from './store'
+import { useCardImage } from './hooks/useCardImage'
 
 interface CompactDeckProps {
   cardCount: number
   playerColor: string
   playerId: string
+  revealedCard?: { cardName: string; revealedBy: string } | null
   onDrawOne: () => void
   onDrawN: (count: number) => void
   onMillOne: () => void
@@ -22,6 +24,7 @@ export function CompactDeck({
   cardCount,
   playerColor,
   playerId,
+  revealedCard,
   onDrawOne,
   onDrawN,
   onMillOne,
@@ -51,6 +54,10 @@ export function CompactDeck({
     cards: Array<{ cardId: string; card: Card }>
     mode: 'scry' | 'peek'
   } | null>(null)
+  const [showRevealPreview, setShowRevealPreview] = useState(false)
+  const [revealPreviewPosition, setRevealPreviewPosition] = useState<{ top: number; left: number } | null>(null)
+
+  const { imageUrl: revealedImageUrl } = useCardImage(revealedCard?.cardName || '')
 
   const handleDoubleClick = () => {
     if (cardCount > 0) {
@@ -98,7 +105,10 @@ export function CompactDeck({
         style={{
           width: '120px',
           height: '160px',
-          backgroundColor: '#333',
+          backgroundColor: revealedCard && revealedImageUrl ? 'transparent' : '#333',
+          backgroundImage: revealedCard && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           border: '2px solid #666',
           borderRadius: '8px',
           display: 'flex',
@@ -109,16 +119,53 @@ export function CompactDeck({
           position: 'relative',
           userSelect: 'none',
         }}
+        onMouseEnter={(e) => {
+          // Only show hover preview if there's a revealed card
+          if (!revealedCard) return
+
+          const rect = e.currentTarget.getBoundingClientRect()
+          const viewportWidth = window.innerWidth
+          const viewportHeight = window.innerHeight
+
+          // Calculate position for preview - show to the left of the deck
+          let left = rect.left - 320 // 300px card width + 20px gap
+          let top = rect.top
+
+          // If would go off left edge, show to the right instead
+          if (left < 8) {
+            left = rect.right + 20
+          }
+
+          // If would go off right edge, center it
+          if (left + 300 > viewportWidth) {
+            left = Math.max(8, (viewportWidth - 300) / 2)
+          }
+
+          // Keep within vertical bounds
+          if (top + 420 > viewportHeight) {
+            top = Math.max(8, viewportHeight - 420 - 8)
+          }
+
+          setRevealPreviewPosition({ top, left })
+          setShowRevealPreview(true)
+        }}
+        onMouseLeave={() => {
+          setShowRevealPreview(false)
+          setRevealPreviewPosition(null)
+        }}
       >
-        <div
-          style={{
-            fontSize: '0.75rem',
-            color: '#999',
-            marginTop: '0.5rem',
-          }}
-        >
-          {cardCount} cards
-        </div>
+        {/* Show card count only when no card is revealed */}
+        {!revealedCard && (
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: '#999',
+              marginTop: '0.5rem',
+            }}
+          >
+            {cardCount} cards
+          </div>
+        )}
 
         {/* Menu Button */}
         <button
@@ -185,6 +232,54 @@ export function CompactDeck({
           📚 {cardCount}
         </div>
       </div>
+
+      {/* Revealed Card Preview - rendered via portal */}
+      {showRevealPreview && revealPreviewPosition && revealedCard && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: `${revealPreviewPosition.top}px`,
+            left: `${revealPreviewPosition.left}px`,
+            width: '300px',
+            height: '420px',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: '3px solid #333',
+            backgroundColor: '#f5f5f5',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.5)',
+            zIndex: 10001,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {revealedImageUrl ? (
+            <img
+              src={revealedImageUrl}
+              alt={revealedCard.cardName}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                padding: '1rem',
+                fontSize: '1.25rem',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                wordBreak: 'break-word',
+              }}
+            >
+              {revealedCard.cardName}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
 
       {/* Menu - rendered via portal */}
       {showMenu && createPortal(

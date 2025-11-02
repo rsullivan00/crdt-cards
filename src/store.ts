@@ -578,6 +578,9 @@ export function drawCards(playerId: string, count: number): void {
     }
   }
 
+  // Clear any revealed card since the top of deck changed
+  clearRevealedCard()
+
   logEvent(playerId, 'draw_cards', { count: actualCount })
 }
 
@@ -603,6 +606,9 @@ export function millCards(playerId: string, count: number): void {
       moveCard(cardId, graveyardZoneId, nextGraveyardOrder + i, playerId, true)
     }
   }
+
+  // Clear any revealed card since the top of deck changed
+  clearRevealedCard()
 
   logEvent(playerId, 'mill_cards', { count: actualCount })
 }
@@ -633,6 +639,9 @@ export function exileFromDeck(playerId: string, count: number, faceDown: boolean
       }
     }
   }
+
+  // Clear any revealed card since the top of deck changed
+  clearRevealedCard()
 
   logEvent(playerId, 'exile_from_deck', { count: actualCount, faceDown })
 }
@@ -731,6 +740,9 @@ export function reorderTopCards(
     }
   })
 
+  // Clear any revealed card since the top of deck changed
+  clearRevealedCard()
+
   logEvent(playerId, 'scry', {
     topCount: topCardIds.length,
     bottomCount: bottomCardIds.length
@@ -772,6 +784,9 @@ export function shuffleDeck(playerId: string): void {
       })
     }
   })
+
+  // Clear any revealed card since the deck was shuffled
+  clearRevealedCard()
 
   logEvent(playerId, 'shuffle_deck', { cardCount: shuffled.length })
 }

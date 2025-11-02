@@ -36,7 +36,6 @@ import { ExileOverlay } from './ExileOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
-import { RevealCardModal } from './RevealCardModal'
 
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
@@ -384,6 +383,7 @@ function App() {
                 cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
                 playerColor={getPlayerColor(displayedPlayerId)}
                 playerId={displayedPlayerId}
+                revealedCard={revealedCard}
                 onDrawOne={() => drawCards(displayedPlayerId, 1)}
                 onDrawN={(count) => drawCards(displayedPlayerId, count)}
                 onMillOne={() => millCards(displayedPlayerId, 1)}
@@ -536,15 +536,6 @@ function App() {
         <TokenCreationModal
           playerId={currentPlayerId}
           onClose={() => setIsTokenModalOpen(false)}
-        />
-      )}
-
-      {/* Revealed Card Modal */}
-      {revealedCard && (
-        <RevealCardModal
-          cardName={revealedCard.cardName}
-          revealedBy={revealedCard.revealedBy}
-          onClose={() => clearRevealedCard()}
         />
       )}
 
