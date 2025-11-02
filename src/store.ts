@@ -315,7 +315,22 @@ export function updateCard(
  * Tap or untap a card
  */
 export function setCardTapped(cardId: string, tapped: boolean, playerId?: string): void {
-  updateCard(cardId, { tapped }, playerId)
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  cardsMap.set(cardId, {
+    ...card,
+    tapped,
+    v: card.v + 1,
+  })
+
+  if (playerId) {
+    logEvent(playerId, 'card_updated', {
+      cardId,
+      oracleId: card.oracleId,  // Include card name for log display
+      updates: { tapped },
+    })
+  }
 }
 
 /**
@@ -688,7 +703,36 @@ export function moveCardToZone(
     newOrder = getNextOrderInZone(targetZoneId)
   }
 
-  moveCard(cardId, targetZoneId, newOrder, playerId)
+  // Check if moving away from battlefield
+  const isLeavingBattlefield = card.zoneId.startsWith('battlefield-')
+  const isGoingToBattlefield = targetZoneId.startsWith('battlefield-')
+
+  // If leaving battlefield and card is tapped, untap it silently as part of the move
+  if (isLeavingBattlefield && !isGoingToBattlefield && card.tapped) {
+    const oldZoneId = card.zoneId
+
+    cardsMap.set(cardId, {
+      ...card,
+      tapped: false,  // Untap silently
+      zoneId: targetZoneId,
+      order: newOrder,
+      v: card.v + 1,
+    })
+
+    // Log only the move, not the untap
+    if (playerId) {
+      logEvent(playerId, 'card_moved', {
+        cardId,
+        oracleId: card.oracleId,
+        from: oldZoneId,
+        to: targetZoneId,
+        order: newOrder,
+      })
+    }
+  } else {
+    // Normal move without auto-untap
+    moveCard(cardId, targetZoneId, newOrder, playerId)
+  }
 }
 
 /**

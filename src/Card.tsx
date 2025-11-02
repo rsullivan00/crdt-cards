@@ -177,7 +177,7 @@ export function Card({
   )
 
   const handleTapToggle = (e: React.MouseEvent) => {
-    if (!isInteractive) return
+    if (!isInteractive || !isInBattlefield) return
     e.stopPropagation()
     setCardTapped(cardId, !card.tapped, playerId)
   }
