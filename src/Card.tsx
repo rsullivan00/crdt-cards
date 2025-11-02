@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, setCardUpsideDown, modifyCounters, counterTypesMap, deleteCard } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, setCardUpsideDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -37,14 +37,17 @@ export function Card({
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
   const [showCountersSubmenu, setShowCountersSubmenu] = useState(false)
+  const [showPlayerSubmenu, setShowPlayerSubmenu] = useState(false)
   const [moveSubmenuPosition, setMoveSubmenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [countersSubmenuPosition, setCountersSubmenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [playerSubmenuPosition, setPlayerSubmenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [counterModal, setCounterModal] = useState<{
     type: 'set' | 'add'
     counterType?: string
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
+  const [otherPlayers, setOtherPlayers] = useState<Array<{ id: string; name: string }>>([])
   const [isDragging, setIsDragging] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -83,6 +86,27 @@ export function Card({
       counterTypesMap.unobserve(updateCounterTypes)
     }
   }, [])
+
+  // Subscribe to players map to track other players
+  useEffect(() => {
+    const updateOtherPlayers = () => {
+      const players: Array<{ id: string; name: string }> = []
+      playersMap.forEach((player, playerId) => {
+        // Exclude the card owner from the list
+        if (playerId !== card.owner) {
+          players.push({ id: playerId, name: player.name })
+        }
+      })
+      setOtherPlayers(players)
+    }
+
+    playersMap.observe(updateOtherPlayers)
+    updateOtherPlayers()
+
+    return () => {
+      playersMap.unobserve(updateOtherPlayers)
+    }
+  }, [card.owner])
 
   const handleAddCounterType = (counterType: string) => {
     // Record this counter type in the room history
@@ -199,6 +223,18 @@ export function Card({
 
     setShowMenu(false)
     setShowMoveSubmenu(false)
+  }
+
+  const handleMoveToPlayer = (targetPlayerId: string) => {
+    const targetZoneId = `battlefield-${targetPlayerId}`
+    moveCardToZone(cardId, targetZoneId, 'auto', playerId)
+
+    // Set card face-up when giving to another player
+    setCardFaceDown(cardId, false, playerId)
+
+    setShowMenu(false)
+    setShowMoveSubmenu(false)
+    setShowPlayerSubmenu(false)
   }
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -1007,7 +1043,7 @@ export function Card({
                 → Deck (top)
               </div>
               <div
-                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                style={menuItemStyle}
                 onClick={() => handleMove('deck', 'bottom', false)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f5f5f5'
@@ -1018,6 +1054,110 @@ export function Card({
               >
                 → Deck (bottom)
               </div>
+
+              {/* Player submenu option - only show if there are other players */}
+              {otherPlayers.length > 0 && (
+                <div
+                  style={{ ...menuItemStyle, borderBottom: 'none' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5'
+
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const viewportWidth = window.innerWidth
+                    const viewportHeight = window.innerHeight
+
+                    // Try to place player submenu to the right
+                    let left = rect.right + 4
+                    let top = rect.top
+
+                    const submenuWidth = 180
+                    const submenuHeight = 150
+
+                    // If would go off right edge, place to the left instead
+                    if (left + submenuWidth > viewportWidth) {
+                      left = rect.left - submenuWidth - 4
+                    }
+
+                    // Keep within viewport vertically
+                    if (top + submenuHeight > viewportHeight) {
+                      top = Math.max(8, viewportHeight - submenuHeight - 8)
+                    }
+
+                    setPlayerSubmenuPosition({ top, left })
+                    setShowPlayerSubmenu(true)
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>→ Player</span>
+                    <span>▶</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Floating submenu for "Player >" */}
+          {showPlayerSubmenu && playerSubmenuPosition && otherPlayers.length > 0 && (
+            <div
+              style={{
+                position: 'fixed',
+                top: `${playerSubmenuPosition.top}px`,
+                left: `${playerSubmenuPosition.left}px`,
+                backgroundColor: 'white',
+                border: '2px solid #333',
+                borderRadius: '6px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                zIndex: 10001,
+                minWidth: '160px',
+              }}
+              onMouseEnter={() => setShowPlayerSubmenu(true)}
+              onMouseLeave={() => {
+                setShowPlayerSubmenu(false)
+                setPlayerSubmenuPosition(null)
+              }}
+            >
+              {otherPlayers.map((player, index) => {
+                const playerColor = getPlayerColor(player.id)
+                return (
+                  <div
+                    key={player.id}
+                    style={{
+                      ...menuItemStyle,
+                      borderBottom: index === otherPlayers.length - 1 ? 'none' : '1px solid #eee',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                    onClick={() => handleMoveToPlayer(player.id)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: playerColor,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span>{player.name}</span>
+                  </div>
+                )
+              })}
             </div>
           )}
         </>,
