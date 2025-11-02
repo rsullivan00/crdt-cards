@@ -13,6 +13,12 @@ interface ImageCache {
   [cardName: string]: CachedImage
 }
 
+// Module-level in-memory cache for instant access across component mounts/unmounts
+const memoryCache = new Map<string, string>()
+
+// Track ongoing fetch requests to avoid duplicate fetches
+const ongoingFetches = new Map<string, Promise<string | null>>()
+
 /**
  * Load image cache from localStorage
  */
@@ -80,23 +86,58 @@ async function fetchCardImage(cardName: string): Promise<string | null> {
  * Hook to fetch and cache card images from Scryfall
  */
 export function useCardImage(cardName: string) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Check memory cache immediately for initial state
+  const cachedUrl = memoryCache.get(cardName)
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl || null)
+  const [loading, setLoading] = useState(!cachedUrl)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    // Skip if empty card name
+    if (!cardName) {
+      setImageUrl(null)
+      setLoading(false)
+      setError(false)
+      return
+    }
+
     let mounted = true
 
     async function loadImage() {
+      // Check memory cache first (instant)
+      const memoryCached = memoryCache.get(cardName)
+      if (memoryCached) {
+        if (mounted) {
+          setImageUrl(memoryCached)
+          setLoading(false)
+          setError(false)
+        }
+        return
+      }
+
+      // Check if there's already an ongoing fetch for this card
+      const ongoingFetch = ongoingFetches.get(cardName)
+      if (ongoingFetch) {
+        const url = await ongoingFetch
+        if (mounted) {
+          setImageUrl(url)
+          setLoading(false)
+          setError(!url)
+        }
+        return
+      }
+
+      // Start loading
       setLoading(true)
       setError(false)
 
-      // Check cache first
+      // Check localStorage cache
       const cache = loadCache()
       const cached = cache[cardName]
 
       if (cached && isCacheValid(cached)) {
-        // Use cached image
+        // Save to memory cache for instant future access
+        memoryCache.set(cardName, cached.imageUrl)
         if (mounted) {
           setImageUrl(cached.imageUrl)
           setLoading(false)
@@ -104,26 +145,35 @@ export function useCardImage(cardName: string) {
         return
       }
 
-      // Fetch from Scryfall
-      const url = await fetchCardImage(cardName)
+      // Create and track the fetch promise
+      const fetchPromise = fetchCardImage(cardName)
+      ongoingFetches.set(cardName, fetchPromise)
 
-      if (mounted) {
-        if (url) {
-          setImageUrl(url)
-          setError(false)
+      try {
+        const url = await fetchPromise
 
-          // Update cache
-          cache[cardName] = {
-            imageUrl: url,
-            scryfallId: '', // Could extract from URL if needed
-            cachedAt: Date.now(),
+        if (mounted) {
+          if (url) {
+            setImageUrl(url)
+            setError(false)
+
+            // Save to both memory and localStorage caches
+            memoryCache.set(cardName, url)
+            cache[cardName] = {
+              imageUrl: url,
+              scryfallId: '',
+              cachedAt: Date.now(),
+            }
+            saveCache(cache)
+          } else {
+            setImageUrl(null)
+            setError(true)
           }
-          saveCache(cache)
-        } else {
-          setImageUrl(null)
-          setError(true)
+          setLoading(false)
         }
-        setLoading(false)
+      } finally {
+        // Clean up ongoing fetch tracking
+        ongoingFetches.delete(cardName)
       }
     }
 

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { NumberInputModal } from './NumberInputModal'
 import { modifyLifeTotal, setLifeTotal } from './store'
 
 interface CompactLifeCounterProps {

@@ -5,7 +5,6 @@ import {
   cardsMap,
   batonMap,
   addPlayer,
-  removePlayer,
   resetRoom,
   drawCards,
   millCards,
@@ -33,6 +32,7 @@ import { GraveyardOverlay } from './GraveyardOverlay'
 import { ExileOverlay } from './ExileOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
+import { TokenCreationModal } from './TokenCreationModal'
 
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
@@ -50,6 +50,7 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false)
   const [isExileOpen, setIsExileOpen] = useState(false)
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -155,23 +156,7 @@ function App() {
     }
   }
 
-  const handleRemovePlayer = (playerId: string, playerName: string) => {
-    setConfirmDialog({
-      message: `Remove ${playerName} from the game? This will delete their zones and cards.`,
-      onConfirm: () => {
-        removePlayer(playerId)
-
-        if (playerId === currentPlayerId) {
-          const storageKey = `crdt-cards-player-${getRoomName()}`
-          localStorage.removeItem(storageKey)
-          setCurrentPlayerId(null)
-          setShowJoinModal(true)
-        }
-
-        setConfirmDialog(null)
-      },
-    })
-  }
+  // Removed handleRemovePlayer - functionality not currently used in UI
 
   const handleResetRoom = () => {
     setConfirmDialog({
@@ -286,7 +271,15 @@ function App() {
       <OpponentBar
         players={players}
         currentPlayerId={currentPlayerId}
-        onSelectPlayer={setViewingOpponentId}
+        viewingPlayerId={viewingOpponentId || currentPlayerId}
+        onSelectPlayer={(playerId) => {
+          // If clicking on current player, reset to their view
+          if (playerId === currentPlayerId) {
+            setViewingOpponentId(null)
+          } else {
+            setViewingOpponentId(playerId)
+          }
+        }}
       />
 
       {/* Main Content Area - Battlefield + Panels + Hand + Bottom Bar */}
@@ -447,6 +440,32 @@ function App() {
                     🚫
                   </button>
 
+                  {/* Token Button */}
+                  <button
+                    onClick={() => setIsTokenModalOpen(!isTokenModalOpen)}
+                    style={{
+                      width: '50px',
+                      height: '40px',
+                      borderRadius: '6px',
+                      backgroundColor: '#FF9800',
+                      color: 'white',
+                      border: 'none',
+                      fontSize: '1.25rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F57C00'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FF9800'
+                    }}
+                    title="Create Tokens"
+                  >
+                    🪙
+                  </button>
+
                   {/* Chat Button */}
                   <button
                     onClick={() => setIsChatOpen(!isChatOpen)}
@@ -479,12 +498,20 @@ function App() {
         </div>
       </div>
 
-      {/* Chat Overlay - Still a modal */}
+      {/* Chat Overlay */}
       <ChatOverlay
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         currentPlayerId={currentPlayerId}
       />
+
+      {/* Token Creation Modal */}
+      {isTokenModalOpen && (
+        <TokenCreationModal
+          playerId={currentPlayerId}
+          onClose={() => setIsTokenModalOpen(false)}
+        />
+      )}
 
       {confirmDialog && (
         <ConfirmDialog
