@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, setCardUpsideDown, modifyCounters, counterTypesMap, deleteCard } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -100,7 +100,7 @@ export function Card({
     padding: '0.5rem',
     position: 'relative',
     transition: 'transform 0.3s ease',
-    transform: card.tapped ? 'rotate(90deg)' : 'rotate(0deg)',
+    transform: `rotate(${card.tapped ? 90 : 0}deg) rotate(${card.upsideDown ? 180 : 0}deg)`,
     cursor: isInteractive ? 'pointer' : 'default',
     display: 'flex',
     flexDirection: 'column',
@@ -293,14 +293,6 @@ export function Card({
 
   // Removed old drag over/drop handlers - will use grid-based drop targets in Zone instead
 
-  if (cardIsFaceDown) {
-    return (
-      <div style={cardStyle} title={`Card ${cardId} (face down)`}>
-        <div style={cardBackStyle}>🂠</div>
-      </div>
-    )
-  }
-
   // Determine positioning style based on zone and position
   const wrapperStyle: React.CSSProperties = isInBattlefield && card.position
     ? {
@@ -329,7 +321,7 @@ export function Card({
           opacity: isDragging ? 0.5 : 1,
           cursor: isInteractive ? 'grab' : 'default',
         }}
-        title={card.oracleId}
+        title={!cardIsFaceDown || card.owner === playerId ? card.oracleId : undefined}
         draggable={isInteractive}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -343,7 +335,10 @@ export function Card({
         onMouseLeave={handleMouseLeave}
       >
         {/* Card Image or Loading/Error State */}
-        {imageLoading ? (
+        {cardIsFaceDown ? (
+          // Show card back for face-down cards
+          <div style={cardBackStyle}>🂠</div>
+        ) : imageLoading ? (
           <div
             style={{
               width: '100%',
@@ -398,10 +393,67 @@ export function Card({
           </div>
         )}
 
-        {/* Overlays */}
-        {totalCounters > 0 && (
-          <div style={counterBadgeStyle} title={`${totalCounters} counters`}>
-            {totalCounters}
+        {/* Overlays - Individual Counter Badges */}
+        {Object.entries(card.counters).length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '5px',
+              right: '5px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              alignItems: 'flex-end',
+            }}
+          >
+            {Object.entries(card.counters)
+              .slice(0, 3)
+              .map(([type, count], index) => {
+                // Abbreviate counter types for display
+                let displayText = count.toString()
+                if (type === '+1/+1') displayText = `+${count}`
+                else if (type === 'Loyalty') displayText = `L${count}`
+                else if (type === '-1/-1') displayText = `-${count}`
+                else displayText = count.toString()
+
+                return (
+                  <div
+                    key={type}
+                    style={{
+                      backgroundColor: type === 'Loyalty' ? '#9C27B0' : '#FF5722',
+                      color: 'white',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      minWidth: '20px',
+                      textAlign: 'center',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                    }}
+                    title={`${type}: ${count}`}
+                  >
+                    {displayText}
+                  </div>
+                )
+              })}
+            {Object.entries(card.counters).length > 3 && (
+              <div
+                style={{
+                  backgroundColor: '#757575',
+                  color: 'white',
+                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  minWidth: '20px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                }}
+                title={`+${Object.entries(card.counters).length - 3} more types`}
+              >
+                ...
+              </div>
+            )}
           </div>
         )}
 
@@ -415,8 +467,8 @@ export function Card({
         )}
 
 
-        {/* Move button */}
-        {isInteractive && (
+        {/* Move button - only show for owner when face down, or everyone when face up */}
+        {isInteractive && (!cardIsFaceDown || card.owner === playerId) && (
           <button
             ref={menuButtonRef}
             onClick={(e) => {
@@ -576,6 +628,26 @@ export function Card({
               <span>Counters...</span>
               <span>▶</span>
             </div>
+
+            {/* Turn Face Down/Up Option - Only show for battlefield and exile */}
+            {(isInBattlefield || card.zoneId.startsWith('exile-')) && (
+              <div
+                style={menuItemStyle}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCardFaceDown(cardId, !card.faceDown, playerId)
+                  setShowMenu(false)
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                {card.faceDown ? '👁️ Turn face up' : '🔒 Turn face down'}
+              </div>
+            )}
 
             {/* Delete Token Option - Only show for tokens */}
             {card.metadata?.isToken && (
@@ -983,6 +1055,8 @@ export function Card({
         const position = getPreviewPosition()
         if (!position) return null
 
+        const hasCounters = Object.entries(card.counters).length > 0
+
         return createPortal(
           <div
             style={{
@@ -990,7 +1064,6 @@ export function Card({
               top: `${position.top}px`,
               left: `${position.left}px`,
               width: '488px',
-              height: '680px',
               zIndex: 10000,
               pointerEvents: 'none', // Allow mouse to pass through
             }}
@@ -1000,13 +1073,52 @@ export function Card({
               alt={card.oracleId}
               style={{
                 width: '100%',
-                height: '100%',
+                height: '680px',
                 borderRadius: '12px',
                 border: '4px solid #fff',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 objectFit: 'cover',
               }}
             />
+            {/* Counter details overlay on preview */}
+            {hasCounters && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  border: '4px solid #fff',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Counters:
+                </div>
+                {Object.entries(card.counters).map(([type, count]) => (
+                  <div
+                    key={type}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '4px 0',
+                      fontSize: '0.85rem',
+                      color: '#fff',
+                    }}
+                  >
+                    <span>{type}</span>
+                    <span style={{ fontWeight: 'bold' }}>×{count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>,
           document.body
         )
