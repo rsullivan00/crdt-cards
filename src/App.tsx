@@ -4,12 +4,15 @@ import {
   zonesMap,
   cardsMap,
   batonMap,
+  revealedCardMap,
   addPlayer,
   resetRoom,
   drawCards,
   millCards,
   exileFromDeck,
   shuffleDeck,
+  revealTopCard,
+  clearRevealedCard,
   getTurnBaton,
   setTurnBaton,
   getPlayerColor,
@@ -33,6 +36,7 @@ import { ExileOverlay } from './ExileOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
+import { RevealCardModal } from './RevealCardModal'
 
 function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
@@ -52,6 +56,7 @@ function App() {
   const [isExileOpen, setIsExileOpen] = useState(false)
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
+  const [revealedCard, setRevealedCard] = useState<{ cardName: string; revealedBy: string } | null>(null)
 
   useEffect(() => {
     // Check if player already joined this room
@@ -98,6 +103,21 @@ function App() {
     cardsMap.observe(updateUI)
     batonMap.observe(updateUI)
 
+    // Subscribe to revealed card changes
+    const updateRevealedCard = () => {
+      const revealed = revealedCardMap.get('current')
+      if (revealed) {
+        setRevealedCard({
+          cardName: revealed.cardName,
+          revealedBy: revealed.revealedBy,
+        })
+      } else {
+        setRevealedCard(null)
+      }
+    }
+    revealedCardMap.observe(updateRevealedCard)
+    updateRevealedCard() // Initial check
+
     updateUI()
 
     return () => {
@@ -105,6 +125,7 @@ function App() {
       zonesMap.unobserve(updateUI)
       cardsMap.unobserve(updateUI)
       batonMap.unobserve(updateUI)
+      revealedCardMap.unobserve(updateRevealedCard)
       provider.off('status', handleStatus)
       provider.off('synced', handleSynced)
     }
@@ -362,11 +383,16 @@ function App() {
               <CompactDeck
                 cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
                 playerColor={getPlayerColor(displayedPlayerId)}
+                playerId={displayedPlayerId}
                 onDrawOne={() => drawCards(displayedPlayerId, 1)}
                 onDrawN={(count) => drawCards(displayedPlayerId, count)}
                 onMillOne={() => millCards(displayedPlayerId, 1)}
                 onMillN={(count) => millCards(displayedPlayerId, count)}
-                onExileOne={() => exileFromDeck(displayedPlayerId, 1)}
+                onExileOne={(faceDown) => exileFromDeck(displayedPlayerId, 1, faceDown)}
+                onExileN={(count, faceDown) => exileFromDeck(displayedPlayerId, count, faceDown)}
+                onRevealTop={() => {
+                  revealTopCard(displayedPlayerId)
+                }}
                 onShuffle={() => shuffleDeck(displayedPlayerId)}
               />
 
@@ -510,6 +536,15 @@ function App() {
         <TokenCreationModal
           playerId={currentPlayerId}
           onClose={() => setIsTokenModalOpen(false)}
+        />
+      )}
+
+      {/* Revealed Card Modal */}
+      {revealedCard && (
+        <RevealCardModal
+          cardName={revealedCard.cardName}
+          revealedBy={revealedCard.revealedBy}
+          onClose={() => clearRevealedCard()}
         />
       )}
 

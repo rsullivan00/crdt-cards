@@ -68,6 +68,7 @@ export const batonMap = ydoc.getMap<Baton>('baton') // Single entry for turn tra
 export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle seed
 export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
 export const counterTypesMap = ydoc.getMap<boolean>('counterTypes') // Track counter types used in this room
+export const revealedCardMap = ydoc.getMap<{ cardName: string; revealedBy: string; timestamp: number }>('revealedCard') // Currently revealed card
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -609,7 +610,7 @@ export function millCards(playerId: string, count: number): void {
 /**
  * Exile cards from top of deck
  */
-export function exileFromDeck(playerId: string, count: number): void {
+export function exileFromDeck(playerId: string, count: number, faceDown: boolean = false): void {
   const deckZoneId = `deck-${playerId}`
   const exileZoneId = `exile-${playerId}`
 
@@ -626,10 +627,114 @@ export function exileFromDeck(playerId: string, count: number): void {
     const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
     if (cardId) {
       moveCard(cardId, exileZoneId, nextExileOrder + i, playerId, true)
+      // Set face-down if requested
+      if (faceDown) {
+        setCardFaceDown(cardId, true)
+      }
     }
   }
 
-  logEvent(playerId, 'exile_from_deck', { count: actualCount })
+  logEvent(playerId, 'exile_from_deck', { count: actualCount, faceDown })
+}
+
+/**
+ * Reveal top card of deck (shows to all players)
+ */
+export function revealTopCard(playerId: string): { cardName: string; playerName: string } | null {
+  const deckZoneId = `deck-${playerId}`
+  const deckCards = getCardsInZone(deckZoneId)
+
+  if (deckCards.length === 0) return null
+
+  const topCard = deckCards[0]
+  const player = playersMap.get(playerId)
+  const playerName = player?.name || playerId
+
+  // Store the revealed card in the CRDT so all players see it
+  revealedCardMap.set('current', {
+    cardName: topCard.oracleId,
+    revealedBy: playerName,
+    timestamp: Date.now(),
+  })
+
+  logEvent(playerId, 'reveal_top_card', { cardName: topCard.oracleId })
+
+  return { cardName: topCard.oracleId, playerName }
+}
+
+/**
+ * Clear the currently revealed card
+ */
+export function clearRevealedCard(): void {
+  revealedCardMap.delete('current')
+}
+
+/**
+ * Get top N cards from deck for scry/peek operations
+ */
+export function getTopCards(playerId: string, count: number): Array<{ cardId: string; card: Card }> {
+  const deckZoneId = `deck-${playerId}`
+  const deckCards = getCardsInZone(deckZoneId)
+  const actualCount = Math.min(count, deckCards.length)
+
+  const result: Array<{ cardId: string; card: Card }> = []
+
+  for (let i = 0; i < actualCount; i++) {
+    const card = deckCards[i]
+    const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
+    if (cardId) {
+      result.push({ cardId, card })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Reorder top cards of deck (for scry)
+ * @param playerId - The player performing the scry
+ * @param topCardIds - Array of card IDs in the new order (top to bottom)
+ * @param bottomCardIds - Array of card IDs to put on bottom (optional)
+ */
+export function reorderTopCards(
+  playerId: string,
+  topCardIds: string[],
+  bottomCardIds: string[] = []
+): void {
+  const deckZoneId = `deck-${playerId}`
+  const deckCards = getCardsInZone(deckZoneId)
+
+  // Get the max order in deck to append bottom cards
+  const maxOrder = deckCards.length > 0 ? Math.max(...deckCards.map(c => c.order)) : 0
+
+  // Reorder top cards (starting at 0)
+  topCardIds.forEach((cardId, index) => {
+    const card = cardsMap.get(cardId)
+    if (card && card.zoneId === deckZoneId) {
+      cardsMap.set(cardId, {
+        ...card,
+        order: index,
+        v: card.v + 1,
+      })
+    }
+  })
+
+  // Put bottom cards at the end
+  bottomCardIds.forEach((cardId, index) => {
+    const card = cardsMap.get(cardId)
+    if (card && card.zoneId === deckZoneId) {
+      cardsMap.set(cardId, {
+        ...card,
+        order: maxOrder + index + 1,
+        v: card.v + 1,
+      })
+    }
+  })
+
+  logEvent(playerId, 'scry', {
+    topCount: topCardIds.length,
+    bottomCount: bottomCardIds.length
+  })
 }
 
 /**
