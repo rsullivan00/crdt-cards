@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, deleteCard } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -36,6 +36,9 @@ export function Card({
 }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
+  const [showCountersSubmenu, setShowCountersSubmenu] = useState(false)
+  const [moveSubmenuPosition, setMoveSubmenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [countersSubmenuPosition, setCountersSubmenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [counterModal, setCounterModal] = useState<{
     type: 'set' | 'add'
@@ -185,10 +188,17 @@ export function Card({
     setCardTapped(cardId, !card.tapped, playerId)
   }
 
-  const handleMove = (targetZone: string, position?: 'top' | 'bottom') => {
+  const handleMove = (targetZone: string, position?: 'top' | 'bottom', faceDown?: boolean) => {
     const targetZoneId = `${targetZone}-${playerId}`
     moveCardToZone(cardId, targetZoneId, position || 'auto', playerId)
+
+    // Set face-down state if specified
+    if (faceDown !== undefined) {
+      setCardFaceDown(cardId, faceDown, playerId)
+    }
+
     setShowMenu(false)
+    setShowMoveSubmenu(false)
   }
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -480,295 +490,91 @@ export function Card({
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowMoveSubmenu(!showMoveSubmenu)
-              }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#f5f5f5'
+
+                // Close counters submenu if open
+                setShowCountersSubmenu(false)
+                setCountersSubmenuPosition(null)
+
+                const rect = e.currentTarget.getBoundingClientRect()
+                const viewportWidth = window.innerWidth
+                const viewportHeight = window.innerHeight
+
+                // Try to place submenu to the right
+                let left = rect.right + 4
+                let top = rect.top
+
+                const submenuWidth = 200
+                const submenuHeight = 300
+
+                // If would go off right edge, place to the left instead
+                if (left + submenuWidth > viewportWidth) {
+                  left = rect.left - submenuWidth - 4
+                }
+
+                // Keep within viewport vertically
+                if (top + submenuHeight > viewportHeight) {
+                  top = Math.max(8, viewportHeight - submenuHeight - 8)
+                }
+
+                setMoveSubmenuPosition({ top, left })
+                setShowMoveSubmenu(true)
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'white'
               }}
             >
               <span>Move to...</span>
-              <span>{showMoveSubmenu ? '▼' : '▶'}</span>
+              <span>▶</span>
             </div>
 
-            {/* Move submenu options */}
-            {showMoveSubmenu && (
-              <>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('hand')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Hand
-                </div>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('battlefield')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Battlefield
-                </div>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('graveyard')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Graveyard
-                </div>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('exile')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Exile
-                </div>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('deck', 'top')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Deck (top)
-                </div>
-                <div
-                  style={{ ...menuItemStyle, paddingLeft: '1.5rem' }}
-                  onClick={() => handleMove('deck', 'bottom')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  → Deck (bottom)
-                </div>
-              </>
-            )}
-
-            {/* Counters Section */}
+            {/* Counters submenu header */}
             <div
               style={{
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.7rem',
+                ...menuItemStyle,
                 fontWeight: 'bold',
-                color: '#666',
-                backgroundColor: '#f9f9f9',
-                borderBottom: '1px solid #eee',
-              }}
-            >
-              COUNTERS
-            </div>
-
-            {/* List existing counters */}
-            {Object.entries(card.counters).map(([type, count]) => (
-              <div
-                key={type}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.75rem',
-                  borderBottom: '1px solid #eee',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontWeight: 'bold' }}>
-                  {type}: {count}
-                </span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      modifyCounters(cardId, type, 1, playerId)
-                    }}
-                    style={{
-                      padding: '2px 6px',
-                      fontSize: '0.7rem',
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    +1
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      modifyCounters(cardId, type, -1, playerId)
-                    }}
-                    style={{
-                      padding: '2px 6px',
-                      fontSize: '0.7rem',
-                      backgroundColor: '#F44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    -1
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setCounterModal({ type: 'set', counterType: type })
-                      setShowMenu(false)
-                    }}
-                    style={{
-                      padding: '2px 6px',
-                      fontSize: '0.7rem',
-                      backgroundColor: '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    Set
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {/* Quick Add Section */}
-            <div
-              style={{
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.7rem',
-                fontWeight: 'bold',
-                color: '#666',
-                backgroundColor: '#f9f9f9',
-                borderBottom: '1px solid #eee',
-              }}
-            >
-              QUICK ADD
-            </div>
-
-            <div
-              style={{
-                padding: '0.5rem 0.75rem',
                 display: 'flex',
-                flexWrap: 'wrap',
-                gap: '4px',
-                borderBottom: '1px solid #eee',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f5f5f5'
+
+                // Close move submenu if open
+                setShowMoveSubmenu(false)
+                setMoveSubmenuPosition(null)
+
+                const rect = e.currentTarget.getBoundingClientRect()
+                const viewportWidth = window.innerWidth
+                const viewportHeight = window.innerHeight
+
+                // Try to place submenu to the right
+                let left = rect.right + 4
+                let top = rect.top
+
+                const submenuWidth = 250
+                const submenuHeight = 400
+
+                // If would go off right edge, place to the left instead
+                if (left + submenuWidth > viewportWidth) {
+                  left = rect.left - submenuWidth - 4
+                }
+
+                // Keep within viewport vertically
+                if (top + submenuHeight > viewportHeight) {
+                  top = Math.max(8, viewportHeight - submenuHeight - 8)
+                }
+
+                setCountersSubmenuPosition({ top, left })
+                setShowCountersSubmenu(true)
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white'
               }}
             >
-              {/* Always show +1/+1 and Loyalty */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleAddCounterType('+1/+1')
-                }}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.7rem',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                +1/+1
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleAddCounterType('Loyalty')
-                }}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.7rem',
-                  backgroundColor: '#9C27B0',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                Loyalty
-              </button>
-
-              {/* Show previously used counter types (excluding the presets) */}
-              {knownCounterTypes
-                .filter((type) => type !== '+1/+1' && type !== 'Loyalty')
-                .map((type) => (
-                  <button
-                    key={type}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleAddCounterType(type)
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '0.7rem',
-                      backgroundColor: '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {type}
-                  </button>
-                ))}
-
-              {/* Custom button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setCounterModal({ type: 'add' })
-                  setShowMenu(false)
-                }}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.7rem',
-                  backgroundColor: '#757575',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
-                Custom...
-              </button>
+              <span>Counters...</span>
+              <span>▶</span>
             </div>
 
             {/* Delete Token Option - Only show for tokens */}
@@ -797,6 +603,351 @@ export function Card({
               </div>
             )}
           </div>
+
+          {/* Floating submenu for "Counters..." */}
+          {showCountersSubmenu && countersSubmenuPosition && (
+            <div
+              style={{
+                position: 'fixed',
+                top: `${countersSubmenuPosition.top}px`,
+                left: `${countersSubmenuPosition.left}px`,
+                backgroundColor: 'white',
+                border: '2px solid #333',
+                borderRadius: '6px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                zIndex: 10000,
+                minWidth: '220px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+              }}
+              onMouseEnter={() => setShowCountersSubmenu(true)}
+              onMouseLeave={() => {
+                setShowCountersSubmenu(false)
+                setCountersSubmenuPosition(null)
+              }}
+            >
+              {/* List existing counters */}
+              {Object.entries(card.counters).length > 0 && (
+                <>
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold',
+                      color: '#666',
+                      backgroundColor: '#f9f9f9',
+                      borderBottom: '1px solid #eee',
+                    }}
+                  >
+                    EXISTING COUNTERS
+                  </div>
+                  {Object.entries(card.counters).map(([type, count]) => (
+                    <div
+                      key={type}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.75rem',
+                        borderBottom: '1px solid #eee',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ fontWeight: 'bold' }}>
+                        {type}: {count}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            modifyCounters(cardId, type, 1, playerId)
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '0.7rem',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          +1
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            modifyCounters(cardId, type, -1, playerId)
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '0.7rem',
+                            backgroundColor: '#F44336',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          -1
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCounterModal({ type: 'set', counterType: type })
+                            setShowMenu(false)
+                            setShowCountersSubmenu(false)
+                          }}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '0.7rem',
+                            backgroundColor: '#2196F3',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          Set
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Quick Add Section */}
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  color: '#666',
+                  backgroundColor: '#f9f9f9',
+                  borderBottom: '1px solid #eee',
+                }}
+              >
+                QUICK ADD
+              </div>
+
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px',
+                  borderBottom: Object.entries(card.counters).length > 0 ? 'none' : '1px solid #eee',
+                }}
+              >
+                {/* Always show +1/+1 and Loyalty */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddCounterType('+1/+1')
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.7rem',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  +1/+1
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddCounterType('Loyalty')
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.7rem',
+                    backgroundColor: '#9C27B0',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Loyalty
+                </button>
+
+                {/* Show previously used counter types (excluding the presets) */}
+                {knownCounterTypes
+                  .filter((type) => type !== '+1/+1' && type !== 'Loyalty')
+                  .map((type) => (
+                    <button
+                      key={type}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleAddCounterType(type)
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.7rem',
+                        backgroundColor: '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+
+                {/* Custom button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCounterModal({ type: 'add' })
+                    setShowMenu(false)
+                    setShowCountersSubmenu(false)
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.7rem',
+                    backgroundColor: '#757575',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Custom...
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Floating submenu for "Move to..." */}
+          {showMoveSubmenu && moveSubmenuPosition && (
+            <div
+              style={{
+                position: 'fixed',
+                top: `${moveSubmenuPosition.top}px`,
+                left: `${moveSubmenuPosition.left}px`,
+                backgroundColor: 'white',
+                border: '2px solid #333',
+                borderRadius: '6px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                zIndex: 10000,
+                minWidth: '180px',
+              }}
+              onMouseEnter={() => setShowMoveSubmenu(true)}
+              onMouseLeave={() => {
+                setShowMoveSubmenu(false)
+                setMoveSubmenuPosition(null)
+              }}
+            >
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('hand', undefined, false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Hand
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('battlefield', undefined, false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Battlefield (face-up)
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('battlefield', undefined, true)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Battlefield (face-down)
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('graveyard', undefined, false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Graveyard
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('exile', undefined, false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Exile (face-up)
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('exile', undefined, true)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Exile (face-down)
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => handleMove('deck', 'top', false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Deck (top)
+              </div>
+              <div
+                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                onClick={() => handleMove('deck', 'bottom', false)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Deck (bottom)
+              </div>
+            </div>
+          )}
         </>,
         document.body
       )}
