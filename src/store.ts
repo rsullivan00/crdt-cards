@@ -332,7 +332,7 @@ export function setCardPosition(
   cardId: string,
   x: number,
   y: number,
-  playerId?: string
+  _playerId?: string
 ): void {
   const card = cardsMap.get(cardId)
   if (!card) return
@@ -743,6 +743,52 @@ export function reorderCard(
   }
 
   moveCard(cardId, targetZoneId, newOrder, playerId)
+}
+
+/**
+ * Create token(s) on the battlefield
+ */
+export function createToken(
+  playerId: string,
+  tokenName: string,
+  quantity: number = 1,
+  imageUrl?: string
+): void {
+  const battlefieldZoneId = `battlefield-${playerId}`
+  const nextOrder = getNextOrderInZone(battlefieldZoneId)
+
+  for (let i = 0; i < quantity; i++) {
+    const tokenId = `${playerId}-token-${Date.now()}-${i}-${crypto.randomUUID()}`
+
+    cardsMap.set(tokenId, {
+      oracleId: tokenName,
+      owner: playerId,
+      zoneId: battlefieldZoneId,
+      order: nextOrder + i,
+      faceDown: false,
+      tapped: false,
+      counters: {},
+      attachments: [],
+      metadata: { isToken: true, imageUrl },
+      v: 0,
+    })
+  }
+
+  logEvent(playerId, 'token_created', { tokenName, quantity })
+}
+
+/**
+ * Delete a card from the game (primarily for tokens)
+ */
+export function deleteCard(cardId: string, playerId?: string): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  cardsMap.delete(cardId)
+
+  if (playerId) {
+    logEvent(playerId, 'card_deleted', { cardId, oracleId: card.oracleId })
+  }
 }
 
 // ============================================================================

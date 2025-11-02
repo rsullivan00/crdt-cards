@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, setCardPosition } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, modifyCounters, counterTypesMap, deleteCard } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -43,18 +43,22 @@ export function Card({
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [localPosition, setLocalPosition] = useState<{ x: number; y: number } | null>(null)
-  const debounceTimerRef = useRef<number | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Determine if this card is in battlefield zone
   const isInBattlefield = card.zoneId.startsWith('battlefield-')
 
-  // Fetch card image from Scryfall (only if not face down)
-  const { imageUrl, loading: imageLoading } = useCardImage(
-    cardIsFaceDown ? '' : card.oracleId
+  // Check if card has hardcoded image URL in metadata (for tokens)
+  const hardcodedImageUrl = card.metadata?.imageUrl as string | undefined
+
+  // Fetch card image from Scryfall (only if not face down and no hardcoded URL)
+  const { imageUrl: scryfallImageUrl, loading: imageLoading } = useCardImage(
+    cardIsFaceDown || hardcodedImageUrl ? '' : card.oracleId
   )
+
+  // Use hardcoded URL if available, otherwise use Scryfall URL
+  const imageUrl = hardcodedImageUrl || scryfallImageUrl
 
   // Subscribe to counter types map
   useEffect(() => {
@@ -707,6 +711,32 @@ export function Card({
                 Custom...
               </button>
             </div>
+
+            {/* Delete Token Option - Only show for tokens */}
+            {card.metadata?.isToken && (
+              <div
+                style={{
+                  ...menuItemStyle,
+                  backgroundColor: '#ffebee',
+                  color: '#c62828',
+                  fontWeight: 'bold',
+                  borderBottom: 'none',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  deleteCard(cardId, playerId)
+                  setShowMenu(false)
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffcdd2'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffebee'
+                }}
+              >
+                🗑️ Delete Token
+              </div>
+            )}
           </div>
         </>,
         document.body
