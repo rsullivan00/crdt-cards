@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createToken } from './store'
 
 interface TokenCreationModalProps {
@@ -12,6 +12,45 @@ interface CommonToken {
   color: string
   emoji: string
   imageUrl: string // Hardcoded Scryfall image URL
+}
+
+interface RecentToken {
+  name: string
+  imageUrl: string
+  timestamp: number
+}
+
+const RECENT_TOKENS_KEY = 'crdt-cards-recent-tokens'
+const MAX_RECENT_TOKENS = 4
+
+// Helper functions for recent tokens
+function getRecentTokens(): RecentToken[] {
+  try {
+    const stored = localStorage.getItem(RECENT_TOKENS_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch (e) {
+    console.error('Failed to load recent tokens:', e)
+    return []
+  }
+}
+
+function saveRecentToken(name: string, imageUrl: string): void {
+  try {
+    const recent = getRecentTokens()
+
+    // Remove if already exists (we'll add it to the front)
+    const filtered = recent.filter(t => t.name !== name)
+
+    // Add to front
+    filtered.unshift({ name, imageUrl, timestamp: Date.now() })
+
+    // Keep only last MAX_RECENT_TOKENS
+    const trimmed = filtered.slice(0, MAX_RECENT_TOKENS)
+
+    localStorage.setItem(RECENT_TOKENS_KEY, JSON.stringify(trimmed))
+  } catch (e) {
+    console.error('Failed to save recent token:', e)
+  }
 }
 
 const COMMON_TOKENS: CommonToken[] = [
@@ -77,10 +116,16 @@ export function TokenCreationModal({ playerId, onClose }: TokenCreationModalProp
   const [quantities, setQuantities] = useState<{ [key: string]: number }>(
     COMMON_TOKENS.reduce((acc, token) => ({ ...acc, [token.name]: 1 }), {})
   )
+  const [recentTokens, setRecentTokens] = useState<RecentToken[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+
+  // Load recent tokens on mount
+  useEffect(() => {
+    setRecentTokens(getRecentTokens())
+  }, [])
 
   const handleCreateToken = (tokenName: string) => {
     const quantity = quantities[tokenName] || 1
@@ -131,7 +176,20 @@ export function TokenCreationModal({ playerId, onClose }: TokenCreationModalProp
   }
 
   const handleSearchResultClick = (card: any) => {
-    createToken(playerId, card.name, 1)
+    const imageUrl = card.image_uris?.normal || card.image_uris?.large || card.image_uris?.small
+
+    // Save to recent tokens
+    if (imageUrl) {
+      saveRecentToken(card.name, imageUrl)
+    }
+
+    createToken(playerId, card.name, 1, imageUrl)
+    onClose()
+  }
+
+  const handleCreateRecentToken = (token: RecentToken) => {
+    const quantity = quantities[token.name] || 1
+    createToken(playerId, token.name, quantity, token.imageUrl)
     onClose()
   }
 
@@ -309,6 +367,126 @@ export function TokenCreationModal({ playerId, onClose }: TokenCreationModalProp
             ))}
           </div>
         </div>
+
+        {/* Recently Used Tokens Section */}
+        {recentTokens.length > 0 && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: '#666' }}>
+              RECENTLY USED
+            </h3>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                gap: '0.75rem',
+              }}
+            >
+              {recentTokens.map((token) => (
+                <div
+                  key={token.name}
+                  style={{
+                    border: '2px solid #ddd',
+                    borderRadius: '6px',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    backgroundColor: '#f0f8ff',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '2rem',
+                      textAlign: 'center',
+                    }}
+                  >
+                    🎴
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      color: '#333',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={token.name}
+                  >
+                    {token.name}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.25rem',
+                    }}
+                  >
+                    <button
+                      onClick={() => handleQuantityChange(token.name, -1)}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        backgroundColor: '#f44336',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      −
+                    </button>
+                    <span
+                      style={{
+                        width: '32px',
+                        textAlign: 'center',
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {quantities[token.name] || 1}
+                    </span>
+                    <button
+                      onClick={() => handleQuantityChange(token.name, 1)}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleCreateRecentToken(token)}
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: '#9C27B0',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    Create
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search Section */}
         <div>
