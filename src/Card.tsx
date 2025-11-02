@@ -43,7 +43,10 @@ export function Card({
   } | null>(null)
   const [knownCounterTypes, setKnownCounterTypes] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const hoverTimeoutRef = useRef<number>()
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Determine if this card is in battlefield zone
@@ -225,6 +228,59 @@ export function Card({
     onDragStateChange?.()
   }
 
+  const handleMouseEnter = () => {
+    // Don't show preview if card is face down, no image, or dragging
+    if (cardIsFaceDown || !imageUrl || isDragging) return
+
+    // Set timeout to show preview after 600ms
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setShowPreview(true)
+    }, 600)
+  }
+
+  const handleMouseLeave = () => {
+    // Clear timeout if mouse leaves before preview shows
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current)
+    }
+    setShowPreview(false)
+  }
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Calculate preview position
+  const getPreviewPosition = (): { top: number; left: number } | null => {
+    if (!cardRef.current) return null
+
+    const rect = cardRef.current.getBoundingClientRect()
+    const previewWidth = 488
+    const previewHeight = 680
+    const gap = 16
+
+    // Try to place on right side
+    let left = rect.right + gap
+    let top = rect.top
+
+    // If too close to right edge, place on left instead
+    if (left + previewWidth > window.innerWidth - 8) {
+      left = rect.left - previewWidth - gap
+    }
+
+    // Keep within viewport vertically
+    if (top + previewHeight > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - previewHeight - 8)
+    }
+
+    return { top, left }
+  }
+
   // Removed old drag over/drop handlers - will use grid-based drop targets in Zone instead
 
   if (cardIsFaceDown) {
@@ -255,6 +311,7 @@ export function Card({
       data-zone-id={card.zoneId}
     >
       <div
+        ref={cardRef}
         style={{
           ...cardStyle,
           padding: 0, // Remove padding for image
@@ -272,6 +329,8 @@ export function Card({
           e.preventDefault()
           setShowMenu(!showMenu)
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Card Image or Loading/Error State */}
         {imageLoading ? (
@@ -767,6 +826,40 @@ export function Card({
           onCancel={() => setCounterModal(null)}
         />
       )}
+
+      {/* Card Preview - rendered via portal */}
+      {showPreview && imageUrl && !cardIsFaceDown && (() => {
+        const position = getPreviewPosition()
+        if (!position) return null
+
+        return createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: `${position.top}px`,
+              left: `${position.left}px`,
+              width: '488px',
+              height: '680px',
+              zIndex: 10000,
+              pointerEvents: 'none', // Allow mouse to pass through
+            }}
+          >
+            <img
+              src={imageUrl}
+              alt={card.oracleId}
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '12px',
+                border: '4px solid #fff',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                objectFit: 'cover',
+              }}
+            />
+          </div>,
+          document.body
+        )
+      })()}
     </div>
   )
 }
