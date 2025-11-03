@@ -17,6 +17,7 @@ interface PlayerQuadrantProps {
   onRevealTopCard: () => void
   onOpenGraveyard: () => void
   onOpenExile: () => void
+  onOpenDeck: () => void
   onCreateToken: () => void
   isCurrentTurn: boolean
   revealedCard: { cardName: string; revealedBy: string } | null
@@ -36,6 +37,7 @@ export function PlayerQuadrant({
   onRevealTopCard,
   onOpenGraveyard,
   onOpenExile,
+  onOpenDeck,
   onCreateToken,
   isCurrentTurn,
   revealedCard,
@@ -86,6 +88,9 @@ export function PlayerQuadrant({
         {/* Opponent stats and zone buttons */}
         {!isCurrentPlayer && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: 'bold' }}>
+              ❤️ {player.lifeTotal}
+            </div>
             <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
               🃏 {getZoneCards(`hand-${playerId}`).length}
             </div>
@@ -128,7 +133,7 @@ export function PlayerQuadrant({
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                onRevealTopCard()
+                onOpenDeck()
               }}
               style={{
                 padding: '0.2rem 0.4rem',
@@ -139,7 +144,7 @@ export function PlayerQuadrant({
                 borderRadius: '3px',
                 cursor: 'pointer',
               }}
-              title="Deck"
+              title="View Deck"
             >
               📚 {getZoneCards(`deck-${playerId}`).length}
             </button>
@@ -327,32 +332,6 @@ export function PlayerQuadrant({
           </>
         )}
       </div>
-
-      {/* Opponent info overlay (for non-current players) */}
-      {!isCurrentPlayer && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            padding: '1rem',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-            textAlign: 'center',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>❤️ {player.lifeTotal}</div>
-          <div style={{ fontSize: '0.875rem', color: '#666' }}>
-            📚 {getZoneCards(`deck-${playerId}`).length} cards
-          </div>
-          <div style={{ fontSize: '0.875rem', color: '#666' }}>
-            🃏 {getZoneCards(`hand-${playerId}`).length} in hand
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -34,6 +34,7 @@ import { OpponentBar } from './OpponentBar'
 import { ChatOverlay } from './ChatOverlay'
 import { GraveyardOverlay } from './GraveyardOverlay'
 import { ExileOverlay } from './ExileOverlay'
+import { DeckOverlay } from './DeckOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
@@ -64,6 +65,7 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false)
   const [isExileOpen, setIsExileOpen] = useState(false)
+  const [isDeckOpen, setIsDeckOpen] = useState(false)
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
@@ -423,6 +425,10 @@ function App() {
               setViewingOpponentId(playerId === currentPlayerId ? null : playerId)
               setIsExileOpen(true)
             }}
+            onOpenDeck={(playerId) => {
+              setViewingOpponentId(playerId === currentPlayerId ? null : playerId)
+              setIsDeckOpen(true)
+            }}
             onCreateToken={() => setIsTokenModalOpen(true)}
             revealedCard={revealedCard}
           />
@@ -629,30 +635,36 @@ function App() {
         </div>
       )}
 
-      {/* Graveyard and Exile Overlays - Only in compact mode */}
-      {layoutMode === 'compact' && (
-        <>
-          <GraveyardOverlay
-            isOpen={isGraveyardOpen}
-            onClose={() => setIsGraveyardOpen(false)}
-            cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
-            playerColor={getPlayerColor(displayedPlayerId)}
-            playerId={displayedPlayerId}
-            isInteractive={displayedPlayerId === currentPlayerId}
-            viewerPlayerId={currentPlayerId}
-          />
+      {/* Zone Overlays - Available in both layout modes */}
+      <GraveyardOverlay
+        isOpen={isGraveyardOpen}
+        onClose={() => setIsGraveyardOpen(false)}
+        cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
+        playerColor={getPlayerColor(displayedPlayerId)}
+        playerId={displayedPlayerId}
+        isInteractive={displayedPlayerId === currentPlayerId}
+        viewerPlayerId={currentPlayerId}
+      />
 
-          <ExileOverlay
-            isOpen={isExileOpen}
-            onClose={() => setIsExileOpen(false)}
-            cards={getZoneCards(`exile-${displayedPlayerId}`)}
-            playerColor={getPlayerColor(displayedPlayerId)}
-            playerId={displayedPlayerId}
-            isInteractive={displayedPlayerId === currentPlayerId}
-            viewerPlayerId={currentPlayerId}
-          />
-        </>
-      )}
+      <ExileOverlay
+        isOpen={isExileOpen}
+        onClose={() => setIsExileOpen(false)}
+        cards={getZoneCards(`exile-${displayedPlayerId}`)}
+        playerColor={getPlayerColor(displayedPlayerId)}
+        playerId={displayedPlayerId}
+        isInteractive={displayedPlayerId === currentPlayerId}
+        viewerPlayerId={currentPlayerId}
+      />
+
+      <DeckOverlay
+        isOpen={isDeckOpen}
+        onClose={() => setIsDeckOpen(false)}
+        cards={getZoneCards(`deck-${displayedPlayerId}`)}
+        playerColor={getPlayerColor(displayedPlayerId)}
+        playerId={displayedPlayerId}
+        viewerPlayerId={currentPlayerId}
+        revealedCard={revealedCard}
+      />
 
       {/* Chat Overlay */}
       <ChatOverlay

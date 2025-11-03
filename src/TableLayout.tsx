@@ -12,6 +12,7 @@ interface TableLayoutProps {
   onRevealTopCard: (playerId: string) => void
   onOpenGraveyard: (playerId: string) => void
   onOpenExile: (playerId: string) => void
+  onOpenDeck: (playerId: string) => void
   onCreateToken: (playerId: string) => void
   revealedCard: { cardName: string; revealedBy: string } | null
 }
@@ -27,6 +28,7 @@ export function TableLayout({
   onRevealTopCard,
   onOpenGraveyard,
   onOpenExile,
+  onOpenDeck,
   onCreateToken,
   revealedCard,
 }: TableLayoutProps) {
@@ -114,6 +116,7 @@ export function TableLayout({
               onRevealTopCard={() => onRevealTopCard(layout.top!.id)}
               onOpenGraveyard={() => onOpenGraveyard(layout.top!.id)}
               onOpenExile={() => onOpenExile(layout.top!.id)}
+              onOpenDeck={() => onOpenDeck(layout.top!.id)}
               onCreateToken={() => onCreateToken(layout.top!.id)}
               isCurrentTurn={currentTurnPlayerId === layout.top.id}
               revealedCard={revealedCard}
@@ -139,6 +142,7 @@ export function TableLayout({
                 onRevealTopCard={() => onRevealTopCard(layout.left!.id)}
                 onOpenGraveyard={() => onOpenGraveyard(layout.left!.id)}
                 onOpenExile={() => onOpenExile(layout.left!.id)}
+                onOpenDeck={() => onOpenDeck(layout.left!.id)}
                 onCreateToken={() => onCreateToken(layout.left!.id)}
                 isCurrentTurn={currentTurnPlayerId === layout.left.id}
                 revealedCard={revealedCard}
@@ -161,6 +165,7 @@ export function TableLayout({
                 onRevealTopCard={() => onRevealTopCard(layout.right!.id)}
                 onOpenGraveyard={() => onOpenGraveyard(layout.right!.id)}
                 onOpenExile={() => onOpenExile(layout.right!.id)}
+                onOpenDeck={() => onOpenDeck(layout.right!.id)}
                 onCreateToken={() => onCreateToken(layout.right!.id)}
                 isCurrentTurn={currentTurnPlayerId === layout.right.id}
                 revealedCard={revealedCard}
@@ -183,6 +188,7 @@ export function TableLayout({
                 onRevealTopCard={() => onRevealTopCard(layout.top!.id)}
                 onOpenGraveyard={() => onOpenGraveyard(layout.top!.id)}
                 onOpenExile={() => onOpenExile(layout.top!.id)}
+                onOpenDeck={() => onOpenDeck(layout.top!.id)}
                 onCreateToken={() => onCreateToken(layout.top!.id)}
                 isCurrentTurn={currentTurnPlayerId === layout.top.id}
                 revealedCard={revealedCard}
@@ -214,6 +220,7 @@ export function TableLayout({
             onRevealTopCard={() => onRevealTopCard(layout.bottom!.id)}
             onOpenGraveyard={() => onOpenGraveyard(layout.bottom!.id)}
             onOpenExile={() => onOpenExile(layout.bottom!.id)}
+            onOpenDeck={() => onOpenDeck(layout.bottom!.id)}
             onCreateToken={() => onCreateToken(layout.bottom!.id)}
             isCurrentTurn={currentTurnPlayerId === layout.bottom.id}
             revealedCard={revealedCard}
