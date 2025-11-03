@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, setCardUpsideDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -141,22 +141,6 @@ export function Card({
     color: '#666',
   }
 
-  const counterBadgeStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '5px',
-    right: '5px',
-    backgroundColor: '#FF5722',
-    color: 'white',
-    borderRadius: '50%',
-    width: '24px',
-    height: '24px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.75rem',
-    fontWeight: 'bold',
-  }
-
   const attachmentIndicatorStyle: React.CSSProperties = {
     position: 'absolute',
     bottom: '5px',
@@ -200,11 +184,6 @@ export function Card({
     fontSize: '0.75rem',
     borderBottom: '1px solid #eee',
   }
-
-  const totalCounters = Object.values(card.counters).reduce(
-    (sum: number, count: number) => sum + count,
-    0
-  )
 
   const handleTapToggle = (e: React.MouseEvent) => {
     if (!isInteractive || !isInBattlefield) return
@@ -444,7 +423,7 @@ export function Card({
           >
             {Object.entries(card.counters)
               .slice(0, 3)
-              .map(([type, count], index) => {
+              .map(([type, count]) => {
                 // Abbreviate counter types for display
                 let displayText = count.toString()
                 if (type === '+1/+1') displayText = `+${count}`

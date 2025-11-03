@@ -48,7 +48,6 @@ function App() {
 
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
   const [showJoinModal, setShowJoinModal] = useState(false)
-  const [currentTurn, setCurrentTurn] = useState<string>('')
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -97,11 +96,6 @@ function App() {
 
     // Subscribe to changes
     const updateUI = () => {
-      const baton = getTurnBaton()
-      if (baton) {
-        const player = playersMap.get(baton.playerId)
-        setCurrentTurn(`${player?.name || baton.playerId} - ${baton.step}`)
-      }
       forceUpdate({})
     }
 
