@@ -87,17 +87,47 @@ export function Zone({
         try {
           const selectedCards: { id: string; relativeX: number; relativeY: number }[] = JSON.parse(selectedCardsData)
           
-          // Move all selected cards maintaining their relative positions
-          selectedCards.forEach(({ id, relativeX, relativeY }) => {
-            // If dropping from a different zone, move card first
-            const cardFromZone = e.dataTransfer.getData('fromZoneId')
-            if (cardFromZone !== zoneId) {
-              moveCardToZone(id, zoneId, 'auto', playerId)
-            }
+          // Check if cards are from battlefield (have meaningful relative positions)
+          // or from other zones (all relative positions are 0)
+          const fromBattlefield = selectedCards.some(({ relativeX, relativeY }) => 
+            relativeX !== 0 || relativeY !== 0
+          )
+          
+          if (fromBattlefield) {
+            // Move all selected cards maintaining their relative positions
+            selectedCards.forEach(({ id, relativeX, relativeY }) => {
+              // If dropping from a different zone, move card first
+              const cardFromZone = e.dataTransfer.getData('fromZoneId')
+              if (cardFromZone !== zoneId) {
+                moveCardToZone(id, zoneId, 'auto', playerId)
+              }
+              
+              // Set position with relative offset
+              setCardPosition(id, baseX + relativeX, baseY + relativeY, playerId)
+            })
+          } else {
+            // Cards from other zones - arrange in a grid
+            const cardWidth = 120
+            const cardHeight = 160
+            const gap = 10
+            const cardsPerRow = 5
             
-            // Set position with relative offset
-            setCardPosition(id, baseX + relativeX, baseY + relativeY, playerId)
-          })
+            selectedCards.forEach(({ id }, index) => {
+              // If dropping from a different zone, move card first
+              const cardFromZone = e.dataTransfer.getData('fromZoneId')
+              if (cardFromZone !== zoneId) {
+                moveCardToZone(id, zoneId, 'auto', playerId)
+              }
+              
+              // Calculate grid position
+              const col = index % cardsPerRow
+              const row = Math.floor(index / cardsPerRow)
+              const x = baseX + col * (cardWidth + gap)
+              const y = baseY + row * (cardHeight + gap)
+              
+              setCardPosition(id, x, y, playerId)
+            })
+          }
           
           // Keep selection active for additional operations
           return

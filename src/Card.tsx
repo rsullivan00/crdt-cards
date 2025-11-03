@@ -219,16 +219,22 @@ export function Card({
   }
 
   const handleTapToggle = (e: React.MouseEvent) => {
-    if (!isInteractive || !isInBattlefield) return
+    if (!isInteractive) return
     e.stopPropagation()
     
-    // Ctrl+click for selection
+    // Ctrl+click for selection (works in all zones)
     if (e.ctrlKey || e.metaKey) {
       toggleCardSelection(cardId)
       return
     }
     
-    // Normal click - clear selection and tap
+    // Only battlefield cards can be tapped - for other zones, just clear selection
+    if (!isInBattlefield) {
+      clearSelection()
+      return
+    }
+    
+    // Normal click in battlefield - clear selection and tap
     clearSelection()
     setCardTapped(cardId, !card.tapped, playerId)
   }
@@ -315,20 +321,32 @@ export function Card({
     // If this card is part of a selection, include all selected cards
     const selectedCards = getSelectedCardIds()
     if (isSelected && selectedCards.size > 1) {
-      // Store all selected card IDs and their relative positions
       const cardsMap = ydoc.getMap('cards')
       const selectedCardData: { id: string; relativeX: number; relativeY: number }[] = []
       
-      cardsMap.forEach((cardData, cardIdKey) => {
-        const typedCard = cardData as CardType
-        if (selectedCards.has(cardIdKey) && typedCard.position) {
+      // Check if we're dragging from battlefield (cards have positions)
+      if (card.position) {
+        // Battlefield: store relative positions to maintain layout
+        cardsMap.forEach((cardData, cardIdKey) => {
+          const typedCard = cardData as CardType
+          if (selectedCards.has(cardIdKey) && typedCard.position) {
+            selectedCardData.push({
+              id: cardIdKey,
+              relativeX: typedCard.position.x - card.position!.x,
+              relativeY: typedCard.position.y - card.position!.y,
+            })
+          }
+        })
+      } else {
+        // Other zones: just include all selected card IDs, will be positioned in a grid
+        selectedCards.forEach(selectedCardId => {
           selectedCardData.push({
-            id: cardIdKey,
-            relativeX: typedCard.position.x - card.position!.x,
-            relativeY: typedCard.position.y - card.position!.y,
+            id: selectedCardId,
+            relativeX: 0,
+            relativeY: 0,
           })
-        }
-      })
+        })
+      }
       
       e.dataTransfer.setData('selectedCards', JSON.stringify(selectedCardData))
     }
