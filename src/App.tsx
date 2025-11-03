@@ -24,6 +24,8 @@ import {
   setLastUsedDeckId,
   STARTER_DECKS,
   importFromLocalFile,
+  getSelectedCardIds,
+  setCardTapped,
 } from './store'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
@@ -36,6 +38,7 @@ import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
 import { Homepage } from './Homepage'
+import { HelpModal } from './HelpModal'
 
 function App() {
   // Check if we're on the homepage (no room hash)
@@ -61,6 +64,7 @@ function App() {
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false)
   const [isExileOpen, setIsExileOpen] = useState(false)
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
   const [revealedCard, setRevealedCard] = useState<{ cardName: string; revealedBy: string } | null>(null)
 
@@ -121,6 +125,46 @@ function App() {
 
     updateUI()
 
+    // Keyboard handler for "t" key to tap/untap selected cards
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle "t" key if not typing in an input/textarea
+      if (e.key === 't' || e.key === 'T') {
+        const activeElement = document.activeElement
+        if (activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA') {
+          return // Don't intercept if typing in a text field
+        }
+
+        const selectedCards = getSelectedCardIds()
+        if (selectedCards.size === 0 || !currentPlayerId) return
+
+        // Check if selected cards are in battlefield and determine new tap state
+        const cardsMapData = cardsMap
+        let firstCard: CardType | undefined
+        let isFirstCardInBattlefield = false
+
+        selectedCards.forEach(selectedCardId => {
+          const card = cardsMapData.get(selectedCardId) as CardType
+          if (card && !firstCard) {
+            firstCard = card
+            isFirstCardInBattlefield = card.zoneId.startsWith('battlefield-')
+          }
+        })
+
+        // Only tap cards that are in battlefield
+        if (firstCard && isFirstCardInBattlefield) {
+          const newTappedState = !firstCard.tapped
+          selectedCards.forEach(selectedCardId => {
+            const card = cardsMapData.get(selectedCardId) as CardType
+            if (card && card.zoneId.startsWith('battlefield-')) {
+              setCardTapped(selectedCardId, newTappedState, currentPlayerId)
+            }
+          })
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
     return () => {
       playersMap.unobserve(updateUI)
       zonesMap.unobserve(updateUI)
@@ -129,6 +173,7 @@ function App() {
       revealedCardMap.unobserve(updateRevealedCard)
       provider.off('status', handleStatus)
       provider.off('synced', handleSynced)
+      window.removeEventListener('keydown', handleKeyDown)
     }
   }, [currentPlayerId])
 
@@ -250,6 +295,27 @@ function App() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: 'bold',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Help"
+          >
+            ?
+          </button>
           <button
             onClick={handleNextTurn}
             style={{
@@ -549,6 +615,12 @@ function App() {
           onCancel={() => setConfirmDialog(null)}
         />
       )}
+
+      {/* Help Modal */}
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+      />
     </div>
   )
 }

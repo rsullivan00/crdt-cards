@@ -127,7 +127,7 @@ export function Card({
   const handleAddCounterType = (counterType: string) => {
     // Record this counter type in the room history
     counterTypesMap.set(counterType, true)
-    
+
     // Use the captured selection state from when menu opened
     const currentlySelected = menuSelectedCards.has(cardId)
     console.log('handleAddCounterType:', {
@@ -221,35 +221,48 @@ export function Card({
   const handleTapToggle = (e: React.MouseEvent) => {
     if (!isInteractive) return
     e.stopPropagation()
-    
+
     // Ctrl+click for selection (works in all zones)
     if (e.ctrlKey || e.metaKey) {
       toggleCardSelection(cardId)
       return
     }
-    
+
     // Only battlefield cards can be tapped - for other zones, just clear selection
     if (!isInBattlefield) {
       clearSelection()
       return
     }
-    
-    // Normal click in battlefield - clear selection and tap
-    clearSelection()
-    setCardTapped(cardId, !card.tapped, playerId)
+
+    // Check if this card is part of a selection
+    const currentlySelected = isCardSelected(cardId)
+    const selectedCards = getSelectedCardIds()
+
+    if (currentlySelected && selectedCards.size > 1) {
+      // Tap/untap all selected cards together
+      const newTappedState = !card.tapped
+      selectedCards.forEach(selectedCardId => {
+        setCardTapped(selectedCardId, newTappedState, playerId)
+      })
+      // Keep selection active for additional operations
+    } else {
+      // Normal click - clear selection and tap just this card
+      clearSelection()
+      setCardTapped(cardId, !card.tapped, playerId)
+    }
   }
 
   const handleMove = (targetZone: string, position?: 'top' | 'bottom', faceDown?: boolean) => {
     const targetZoneId = `${targetZone}-${playerId}`
-    
+
     // Use the captured selection state from when menu opened
     const currentlySelected = menuSelectedCards.has(cardId)
-    
+
     // If this card is selected and there are multiple selections, move all of them
     if (currentlySelected && menuSelectedCards.size > 1) {
       menuSelectedCards.forEach(selectedCardId => {
         moveCardToZone(selectedCardId, targetZoneId, position || 'auto', playerId)
-        
+
         // Set face-down state if specified
         if (faceDown !== undefined) {
           setCardFaceDown(selectedCardId, faceDown, playerId)
@@ -259,7 +272,7 @@ export function Card({
     } else {
       // Move just this card
       moveCardToZone(cardId, targetZoneId, position || 'auto', playerId)
-      
+
       // Set face-down state if specified
       if (faceDown !== undefined) {
         setCardFaceDown(cardId, faceDown, playerId)
@@ -272,10 +285,10 @@ export function Card({
 
   const handleMoveToPlayer = (targetPlayerId: string) => {
     const targetZoneId = `battlefield-${targetPlayerId}`
-    
+
     // Use the captured selection state from when menu opened
     const currentlySelected = menuSelectedCards.has(cardId)
-    
+
     // If this card is selected and there are multiple selections, move all of them
     if (currentlySelected && menuSelectedCards.size > 1) {
       menuSelectedCards.forEach(selectedCardId => {
@@ -323,7 +336,7 @@ export function Card({
     if (isSelected && selectedCards.size > 1) {
       const cardsMap = ydoc.getMap('cards')
       const selectedCardData: { id: string; relativeX: number; relativeY: number }[] = []
-      
+
       // Check if we're dragging from battlefield (cards have positions)
       if (card.position) {
         // Battlefield: store relative positions to maintain layout
@@ -347,7 +360,7 @@ export function Card({
           })
         })
       }
-      
+
       e.dataTransfer.setData('selectedCards', JSON.stringify(selectedCardData))
     }
 
@@ -615,7 +628,7 @@ export function Card({
             ref={menuButtonRef}
             onClick={(e) => {
               e.stopPropagation()
-              
+
               // Capture selection state when menu button is clicked
               const selectedCards = getSelectedCardIds()
               const currentlySelected = isCardSelected(cardId)
@@ -626,7 +639,7 @@ export function Card({
                 selectedCardsSize: selectedCards.size,
                 selectedCardIds: Array.from(selectedCards)
               })
-              
+
               if (!showMenu && menuButtonRef.current) {
                 const rect = menuButtonRef.current.getBoundingClientRect()
                 const viewportHeight = window.innerHeight
@@ -734,8 +747,8 @@ export function Card({
               <span>
                 Move to...
                 {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
-                  <span style={{ 
-                    marginLeft: '6px', 
+                  <span style={{
+                    marginLeft: '6px',
                     color: '#2196F3',
                     fontWeight: 'bold',
                     fontSize: '0.9em'
@@ -794,8 +807,8 @@ export function Card({
               <span>
                 Counters...
                 {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
-                  <span style={{ 
-                    marginLeft: '6px', 
+                  <span style={{
+                    marginLeft: '6px',
                     color: '#2196F3',
                     fontWeight: 'bold',
                     fontSize: '0.9em'
@@ -813,7 +826,21 @@ export function Card({
                 style={menuItemStyle}
                 onClick={(e) => {
                   e.stopPropagation()
-                  setCardFaceDown(cardId, !card.faceDown, playerId)
+                  
+                  // Use the captured selection state from when menu opened
+                  const currentlySelected = menuSelectedCards.has(cardId)
+                  const newFaceDownState = !card.faceDown
+                  
+                  if (currentlySelected && menuSelectedCards.size > 1) {
+                    // Apply to all selected cards
+                    menuSelectedCards.forEach(selectedCardId => {
+                      setCardFaceDown(selectedCardId, newFaceDownState, playerId)
+                    })
+                  } else {
+                    // Apply to just this card
+                    setCardFaceDown(cardId, newFaceDownState, playerId)
+                  }
+                  
                   setShowMenu(false)
                 }}
                 onMouseEnter={(e) => {
@@ -824,6 +851,16 @@ export function Card({
                 }}
               >
                 {card.faceDown ? '👁️ Turn face up' : '🔒 Turn face down'}
+                {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
+                  <span style={{
+                    marginLeft: '6px',
+                    color: '#2196F3',
+                    fontWeight: 'bold',
+                    fontSize: '0.9em'
+                  }}>
+                    ({menuSelectedCards.size} cards)
+                  </span>
+                )}
               </div>
             )}
 
@@ -1256,8 +1293,8 @@ export function Card({
                     <span>
                       → Player
                       {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
-                        <span style={{ 
-                          marginLeft: '6px', 
+                        <span style={{
+                          marginLeft: '6px',
                           color: '#2196F3',
                           fontWeight: 'bold',
                           fontSize: '0.9em'
