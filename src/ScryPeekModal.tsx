@@ -5,7 +5,7 @@ import { useCardImage } from './hooks/useCardImage'
 
 interface ScryPeekModalProps {
   cards: Array<{ cardId: string; card: Card }>
-  mode: 'scry' | 'peek'
+  mode: 'scry' | 'peek' | 'surveil'
   playerId?: string
   onConfirm?: (topCardIds: string[], bottomCardIds: string[]) => void
   onCancel: () => void
@@ -14,21 +14,30 @@ interface ScryPeekModalProps {
 export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: ScryPeekModalProps) {
   const [topCards, setTopCards] = useState<string[]>(cards.map(c => c.cardId))
   const [bottomCards, setBottomCards] = useState<string[]>([])
+  const [graveyardCards, setGraveyardCards] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set())
 
   const handleMoveToBottom = (cardId: string) => {
     setTopCards(prev => prev.filter(id => id !== cardId))
     setBottomCards(prev => [...prev, cardId])
+    setGraveyardCards(prev => prev.filter(id => id !== cardId))
   }
 
   const handleMoveToTop = (cardId: string) => {
     setBottomCards(prev => prev.filter(id => id !== cardId))
     setTopCards(prev => [...prev, cardId])
+    setGraveyardCards(prev => prev.filter(id => id !== cardId))
   }
 
-  const handleReorder = (cardId: string, direction: 'up' | 'down', list: 'top' | 'bottom') => {
-    const setter = list === 'top' ? setTopCards : setBottomCards
+  const handleMoveToGraveyard = (cardId: string) => {
+    setTopCards(prev => prev.filter(id => id !== cardId))
+    setBottomCards(prev => prev.filter(id => id !== cardId))
+    setGraveyardCards(prev => [...prev, cardId])
+  }
+
+  const handleReorder = (cardId: string, direction: 'up' | 'down', list: 'top' | 'bottom' | 'graveyard') => {
+    const setter = list === 'top' ? setTopCards : list === 'bottom' ? setBottomCards : setGraveyardCards
     setter(prev => {
       const index = prev.indexOf(cardId)
       if (index === -1) return prev
@@ -43,7 +52,13 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
   }
 
   const handleConfirm = () => {
-    if (mode === 'scry' && onConfirm) {
+    if ((mode === 'scry' || mode === 'surveil') && onConfirm) {
+      if (mode === 'surveil' && playerId) {
+        // For surveil, move graveyard cards to actual graveyard
+        graveyardCards.forEach(cardId => {
+          moveCardToZone(cardId, `graveyard-${playerId}`, 'auto', playerId)
+        })
+      }
       onConfirm(topCards, bottomCards)
     }
     onCancel()
@@ -62,6 +77,11 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
   })
 
   const filteredBottomCards = bottomCards.filter(cardId => {
+    const name = getCardName(cardId).toLowerCase()
+    return name.includes(searchTerm.toLowerCase())
+  })
+
+  const filteredGraveyardCards = graveyardCards.filter(cardId => {
     const name = getCardName(cardId).toLowerCase()
     return name.includes(searchTerm.toLowerCase())
   })
@@ -86,6 +106,7 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
     // Remove the moved card from the modal's local state
     setTopCards(prev => prev.filter(id => id !== cardId))
     setBottomCards(prev => prev.filter(id => id !== cardId))
+    setGraveyardCards(prev => prev.filter(id => id !== cardId))
     setSelectedCards(prev => {
       const newSet = new Set(prev)
       newSet.delete(cardId)
@@ -122,7 +143,7 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
         onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem' }}>
-          {mode === 'scry' ? 'Scry' : 'View'} {cards.length}
+          {mode === 'scry' ? 'Scry' : mode === 'surveil' ? 'Surveil' : 'View'} {cards.length}
         </h2>
 
         {mode === 'peek' && (
@@ -134,6 +155,12 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
         {mode === 'scry' && (
           <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#666' }}>
             Reorder cards and choose which to put on top or bottom of your deck
+          </p>
+        )}
+
+        {mode === 'surveil' && (
+          <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#666' }}>
+            Put any number of cards in your graveyard and the rest back on top in any order
           </p>
         )}
 
@@ -178,11 +205,12 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
                     cardId={cardId}
                     card={cardData.card}
                     position={actualIndex + 1}
-                    canMoveUp={mode === 'scry' && actualIndex > 0}
-                    canMoveDown={mode === 'scry' && actualIndex < topCards.length - 1}
+                    canMoveUp={(mode === 'scry' || mode === 'surveil') && actualIndex > 0}
+                    canMoveDown={(mode === 'scry' || mode === 'surveil') && actualIndex < topCards.length - 1}
                     onMoveUp={() => handleReorder(cardId, 'up', 'top')}
                     onMoveDown={() => handleReorder(cardId, 'down', 'top')}
                     onMoveToBottom={mode === 'scry' ? () => handleMoveToBottom(cardId) : undefined}
+                    onMoveToGraveyard={mode === 'surveil' ? () => handleMoveToGraveyard(cardId) : undefined}
                     isSelected={selectedCards.has(cardId)}
                     onClick={(e) => handleCardClick(cardId, e)}
                     playerId={playerId}
@@ -237,6 +265,47 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
           </div>
         )}
 
+        {/* Graveyard Section (for surveil) */}
+        {mode === 'surveil' && filteredGraveyardCards.length > 0 && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: '#333' }}>
+              To Graveyard ({graveyardCards.length}{searchTerm ? `, showing ${filteredGraveyardCards.length}` : ''})
+            </h3>
+            <div
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              {filteredGraveyardCards.map((cardId) => {
+                const cardData = cards.find(c => c.cardId === cardId)
+                if (!cardData) return null
+                const actualIndex = graveyardCards.indexOf(cardId)
+                return (
+                  <CardDisplay
+                    key={cardId}
+                    cardId={cardId}
+                    card={cardData.card}
+                    position={actualIndex + 1}
+                    canMoveUp={actualIndex > 0}
+                    canMoveDown={actualIndex < graveyardCards.length - 1}
+                    onMoveUp={() => handleReorder(cardId, 'up', 'graveyard')}
+                    onMoveDown={() => handleReorder(cardId, 'down', 'graveyard')}
+                    onMoveToTop={() => handleMoveToTop(cardId)}
+                    isSelected={selectedCards.has(cardId)}
+                    onClick={(e) => handleCardClick(cardId, e)}
+                    playerId={playerId}
+                    mode={mode}
+                    onCardMoved={handleCardMoved}
+                    selectedCards={selectedCards}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
           <button
@@ -252,7 +321,7 @@ export function ScryPeekModal({ cards, mode, playerId, onConfirm, onCancel }: Sc
           >
             {mode === 'peek' ? 'Close' : 'Cancel'}
           </button>
-          {mode === 'scry' && (
+          {(mode === 'scry' || mode === 'surveil') && (
             <button
               onClick={handleConfirm}
               style={{
@@ -285,10 +354,11 @@ interface CardDisplayProps {
   onMoveDown: () => void
   onMoveToBottom?: () => void
   onMoveToTop?: () => void
+  onMoveToGraveyard?: () => void
   isSelected?: boolean
   onClick?: (e: React.MouseEvent) => void
   playerId?: string
-  mode: 'scry' | 'peek'
+  mode: 'scry' | 'peek' | 'surveil'
   onCardMoved?: (cardId: string) => void
   selectedCards?: Set<string>
 }
@@ -303,6 +373,7 @@ function CardDisplay({
   onMoveDown,
   onMoveToBottom,
   onMoveToTop,
+  onMoveToGraveyard,
   isSelected = false,
   onClick,
   playerId,
@@ -527,6 +598,22 @@ function CardDisplay({
             }}
           >
             To Top
+          </button>
+        )}
+        {onMoveToGraveyard && (
+          <button
+            onClick={onMoveToGraveyard}
+            style={{
+              padding: '4px 8px',
+              fontSize: '0.7rem',
+              backgroundColor: '#9E9E9E',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            To Graveyard
           </button>
         )}
       </div>

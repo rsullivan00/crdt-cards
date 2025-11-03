@@ -52,7 +52,7 @@ export function CompactDeck({
   } | null>(null)
   const [scryPeekModal, setScryPeekModal] = useState<{
     cards: Array<{ cardId: string; card: Card }>
-    mode: 'scry' | 'peek'
+    mode: 'scry' | 'peek' | 'surveil'
   } | null>(null)
   const [showRevealPreview, setShowRevealPreview] = useState(false)
   const [revealPreviewPosition, setRevealPreviewPosition] = useState<{ top: number; left: number } | null>(null)
@@ -845,7 +845,7 @@ export function CompactDeck({
                 → Scry 1
               </div>
               <div
-                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                style={menuItemStyle}
                 onClick={() => {
                   setNumberModal({
                     title: 'Scry how many cards?',
@@ -868,6 +868,50 @@ export function CompactDeck({
                 }}
               >
                 → Scry N
+              </div>
+              <div
+                style={menuItemStyle}
+                onClick={() => {
+                  const cards = getTopCards(playerId, 1)
+                  if (cards.length > 0) {
+                    setScryPeekModal({ cards, mode: 'surveil' })
+                    setShowMenu(false)
+                    setShowScrySubmenu(false)
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Surveil 1
+              </div>
+              <div
+                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                onClick={() => {
+                  setNumberModal({
+                    title: 'Surveil how many cards?',
+                    onConfirm: (n) => {
+                      const cards = getTopCards(playerId, n)
+                      if (cards.length > 0) {
+                        setScryPeekModal({ cards, mode: 'surveil' })
+                      }
+                      setNumberModal(null)
+                      setShowMenu(false)
+                      setShowScrySubmenu(false)
+                    },
+                  })
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → Surveil N
               </div>
             </div>
           )}
