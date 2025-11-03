@@ -12,7 +12,6 @@ import {
   exileFromDeck,
   shuffleDeck,
   revealTopCard,
-  clearRevealedCard,
   getTurnBaton,
   setTurnBaton,
   getPlayerColor,
@@ -36,8 +35,17 @@ import { ExileOverlay } from './ExileOverlay'
 import { CompactDeck } from './CompactDeck'
 import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
+import { Homepage } from './Homepage'
 
 function App() {
+  // Check if we're on the homepage (no room hash)
+  const hasRoomHash = window.location.hash && window.location.hash !== '#'
+
+  // Show homepage if no room specified
+  if (!hasRoomHash) {
+    return <Homepage />
+  }
+
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [currentTurn, setCurrentTurn] = useState<string>('')
@@ -141,6 +149,7 @@ function App() {
       if (result.success && result.deck) {
         applyDeckToPlayer(playerId, result.deck)
         setLastUsedDeckId(result.deck.id)
+        shuffleDeck(playerId)
         drawCards(playerId, 7)
       }
     } else {
@@ -149,6 +158,7 @@ function App() {
       if (deck) {
         applyDeckToPlayer(playerId, deck)
         setLastUsedDeckId(deckId)
+        shuffleDeck(playerId)
         drawCards(playerId, 7)
       }
     }
@@ -240,10 +250,9 @@ function App() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>CRDT Cards</h1>
-          <div style={{ fontSize: '0.75rem', color: '#666' }}>
-            {currentPlayer?.name}
-            {currentTurn && ` | ${currentTurn}`}
+          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>{window.location.host}</h1>
+          <div style={{ fontSize: '0.875rem', color: '#666' }}>
+            <strong>You:</strong> {currentPlayer?.name || 'Unknown'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

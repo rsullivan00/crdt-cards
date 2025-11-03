@@ -125,7 +125,6 @@ export function CompactDeck({
 
           const rect = e.currentTarget.getBoundingClientRect()
           const viewportWidth = window.innerWidth
-          const viewportHeight = window.innerHeight
 
           // Calculate position for preview - show to the left of the deck
           let left = rect.left - 320 // 300px card width + 20px gap
@@ -142,8 +141,8 @@ export function CompactDeck({
           }
 
           // Keep within vertical bounds
-          if (top + 420 > viewportHeight) {
-            top = Math.max(8, viewportHeight - 420 - 8)
+          if (top + 420 > window.innerHeight) {
+            top = Math.max(8, window.innerHeight - 420 - 8)
           }
 
           setRevealPreviewPosition({ top, left })
@@ -173,7 +172,6 @@ export function CompactDeck({
             e.stopPropagation()
             if (!showMenu) {
               const rect = e.currentTarget.getBoundingClientRect()
-              const viewportHeight = window.innerHeight
               const viewportWidth = window.innerWidth
 
               // Calculate position - place above the button

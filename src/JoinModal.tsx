@@ -127,9 +127,12 @@ export function JoinModal({ onJoin, playerCount }: JoinModalProps) {
           overflowY: 'auto',
         }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: '1rem', textAlign: 'center' }}>
+        <h2 style={{ marginTop: 0, marginBottom: '0.5rem', textAlign: 'center' }}>
           🎴 Join Game
         </h2>
+        <p style={{ margin: '0 0 1rem 0', textAlign: 'center', fontSize: '0.9rem', color: '#666' }}>
+          Room: <strong style={{ fontFamily: 'monospace', color: '#333' }}>{window.location.hash.replace(/^#/, '') || 'default'}</strong>
+        </p>
 
         {isFull ? (
           <div>

@@ -22,6 +22,7 @@ export interface Card {
   order: number // sortable key inside zone (supports stable deck order) - also used as z-index for battlefield
   faceDown: boolean
   tapped: boolean
+  upsideDown: boolean // rotated 180 degrees (for battlefield/exile cards)
   counters: { [key: string]: number } // e.g., { '+1/+1': 3, 'loyalty': 4 }
   attachments: string[] // array of cardIds (auras/equipment)
   metadata: { [key: string]: any } // tokens, notes, etc.
@@ -250,6 +251,7 @@ export function addCard(
     order,
     faceDown: false,
     tapped: false,
+    upsideDown: false,
     counters: {},
     attachments: [],
     metadata: {},
@@ -339,6 +341,28 @@ export function setCardTapped(cardId: string, tapped: boolean, playerId?: string
  */
 export function setCardFaceDown(cardId: string, faceDown: boolean, playerId?: string): void {
   updateCard(cardId, { faceDown }, playerId)
+}
+
+/**
+ * Flip a card upside down or right-side up (180 degree rotation)
+ */
+export function setCardUpsideDown(cardId: string, upsideDown: boolean, playerId?: string): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  cardsMap.set(cardId, {
+    ...card,
+    upsideDown,
+    v: card.v + 1,
+  })
+
+  if (playerId) {
+    logEvent(playerId, 'card_updated', {
+      cardId,
+      oracleId: card.oracleId,
+      updates: { upsideDown },
+    })
+  }
 }
 
 /**
@@ -931,6 +955,7 @@ export function createToken(
       order: nextOrder + i,
       faceDown: false,
       tapped: false,
+      upsideDown: false,
       counters: {},
       attachments: [],
       metadata: { isToken: true, imageUrl },
