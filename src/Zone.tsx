@@ -86,13 +86,13 @@ export function Zone({
       if (selectedCardsData) {
         try {
           const selectedCards: { id: string; relativeX: number; relativeY: number }[] = JSON.parse(selectedCardsData)
-          
+
           // Check if cards are from battlefield (have meaningful relative positions)
           // or from other zones (all relative positions are 0)
-          const fromBattlefield = selectedCards.some(({ relativeX, relativeY }) => 
+          const fromBattlefield = selectedCards.some(({ relativeX, relativeY }) =>
             relativeX !== 0 || relativeY !== 0
           )
-          
+
           if (fromBattlefield) {
             // Move all selected cards maintaining their relative positions
             selectedCards.forEach(({ id, relativeX, relativeY }) => {
@@ -101,7 +101,7 @@ export function Zone({
               if (cardFromZone !== zoneId) {
                 moveCardToZone(id, zoneId, 'auto', playerId)
               }
-              
+
               // Set position with relative offset
               setCardPosition(id, baseX + relativeX, baseY + relativeY, playerId)
             })
@@ -111,24 +111,24 @@ export function Zone({
             const cardHeight = 160
             const gap = 10
             const cardsPerRow = 5
-            
+
             selectedCards.forEach(({ id }, index) => {
               // If dropping from a different zone, move card first
               const cardFromZone = e.dataTransfer.getData('fromZoneId')
               if (cardFromZone !== zoneId) {
                 moveCardToZone(id, zoneId, 'auto', playerId)
               }
-              
+
               // Calculate grid position
               const col = index % cardsPerRow
               const row = Math.floor(index / cardsPerRow)
               const x = baseX + col * (cardWidth + gap)
               const y = baseY + row * (cardHeight + gap)
-              
+
               setCardPosition(id, x, y, playerId)
             })
           }
-          
+
           // Keep selection active for additional operations
           return
         } catch (err) {
@@ -153,7 +153,7 @@ export function Zone({
     if (selectedCardsData) {
       try {
         const selectedCards: { id: string; relativeX: number; relativeY: number }[] = JSON.parse(selectedCardsData)
-        
+
         // Don't do anything if dropping in the same zone
         if (fromZoneId !== zoneId) {
           // Move all selected cards to this zone
@@ -161,7 +161,7 @@ export function Zone({
             moveCardToZone(id, zoneId, 'auto', playerId)
           })
         }
-        
+
         // Keep selection active for additional operations
         return
       } catch (err) {
@@ -183,7 +183,7 @@ export function Zone({
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only enable for battlefield zone and left mouse button
     if (zoneType !== 'battlefield' || e.button !== 0 || !battlefieldRef.current) return
-    
+
     // Don't start selection if clicking on a card
     const target = e.target as HTMLElement
     if (target.closest('[data-card-id]')) return
@@ -195,7 +195,7 @@ export function Zone({
     setIsSelecting(true)
     setSelectionStart({ x, y })
     setSelectionEnd({ x, y })
-    
+
     // Clear selection if not holding Ctrl
     if (!e.ctrlKey && !e.metaKey) {
       clearSelection()
@@ -526,7 +526,7 @@ export function Zone({
               />
             ))
           )}
-          
+
           {/* Selection rectangle */}
           {isSelecting && selectionStart && selectionEnd && (
             <div

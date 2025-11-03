@@ -39,6 +39,7 @@ import { CompactLifeCounter } from './CompactLifeCounter'
 import { TokenCreationModal } from './TokenCreationModal'
 import { Homepage } from './Homepage'
 import { HelpModal } from './HelpModal'
+import { TableLayout } from './TableLayout'
 
 function App() {
   // Check if we're on the homepage (no room hash)
@@ -67,6 +68,18 @@ function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
   const [revealedCard, setRevealedCard] = useState<{ cardName: string; revealedBy: string } | null>(null)
+  
+  // Layout mode state
+  const [layoutMode, setLayoutMode] = useState<'compact' | 'table'>(() => {
+    const saved = localStorage.getItem('crdt-cards-layout-mode')
+    return (saved === 'table' ? 'table' : 'compact') as 'compact' | 'table'
+  })
+  
+  const toggleLayoutMode = () => {
+    const newMode = layoutMode === 'compact' ? 'table' : 'compact'
+    setLayoutMode(newMode)
+    localStorage.setItem('crdt-cards-layout-mode', newMode)
+  }
 
   useEffect(() => {
     // Check if player already joined this room
@@ -296,6 +309,22 @@ function App() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
+            onClick={toggleLayoutMode}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: layoutMode === 'table' ? '#FF9800' : '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+            title={`Switch to ${layoutMode === 'table' ? 'compact' : 'table'} view`}
+          >
+            {layoutMode === 'table' ? '📋 Compact' : '🎲 Table'}
+          </button>
+          <button
             onClick={() => setIsHelpOpen(true)}
             style={{
               padding: '0.5rem 0.75rem',
@@ -356,87 +385,66 @@ function App() {
         </div>
       </div>
 
-      {/* Opponent Bar */}
-      <OpponentBar
-        players={players}
-        currentPlayerId={currentPlayerId}
-        viewingPlayerId={viewingOpponentId || currentPlayerId}
-        onSelectPlayer={(playerId) => {
-          // If clicking on current player, reset to their view
-          if (playerId === currentPlayerId) {
-            setViewingOpponentId(null)
-          } else {
-            setViewingOpponentId(playerId)
-          }
-        }}
-      />
+      {/* Opponent Bar - Only show in compact mode */}
+      {layoutMode === 'compact' && (
+        <OpponentBar
+          players={players}
+          currentPlayerId={currentPlayerId}
+          viewingPlayerId={viewingOpponentId || currentPlayerId}
+          onSelectPlayer={(playerId) => {
+            // If clicking on current player, reset to their view
+            if (playerId === currentPlayerId) {
+              setViewingOpponentId(null)
+            } else {
+              setViewingOpponentId(playerId)
+            }
+          }}
+        />
+      )}
 
-      {/* Main Content Area - Battlefield + Panels + Hand + Bottom Bar */}
-      <div
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Battlefield - Takes remaining space */}
-        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          <Zone
-            zoneId={`battlefield-${displayedPlayerId}`}
-            zoneName="Battlefield"
-            zoneType="battlefield"
-            cards={getZoneCards(`battlefield-${displayedPlayerId}`)}
-            playerColor={getPlayerColor(displayedPlayerId)}
-            playerId={displayedPlayerId}
-            isInteractive={displayedPlayerId === currentPlayerId}
-            viewerPlayerId={currentPlayerId}
+      {/* Main Content Area - Conditional based on layout mode */}
+      {layoutMode === 'table' ? (
+        /* Table Layout - Full screen quadrants */
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <TableLayout
+            players={players}
+            currentPlayerId={currentPlayerId}
+            getZoneCards={getZoneCards}
+            onDrawCards={drawCards}
+            onMillCards={millCards}
+            onExileFromDeck={exileFromDeck}
+            onShuffleDeck={shuffleDeck}
+            onRevealTopCard={revealTopCard}
+            onOpenGraveyard={(playerId) => {
+              setViewingOpponentId(playerId === currentPlayerId ? null : playerId)
+              setIsGraveyardOpen(true)
+            }}
+            onOpenExile={(playerId) => {
+              setViewingOpponentId(playerId === currentPlayerId ? null : playerId)
+              setIsExileOpen(true)
+            }}
+            onCreateToken={() => setIsTokenModalOpen(true)}
+            revealedCard={revealedCard}
           />
         </div>
-
-        {/* Graveyard Expansion Panel */}
-        <GraveyardOverlay
-          isOpen={isGraveyardOpen}
-          onClose={() => setIsGraveyardOpen(false)}
-          cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
-          playerColor={getPlayerColor(displayedPlayerId)}
-          playerId={displayedPlayerId}
-          isInteractive={displayedPlayerId === currentPlayerId}
-          viewerPlayerId={currentPlayerId}
-        />
-
-        {/* Exile Expansion Panel */}
-        <ExileOverlay
-          isOpen={isExileOpen}
-          onClose={() => setIsExileOpen(false)}
-          cards={getZoneCards(`exile-${displayedPlayerId}`)}
-          playerColor={getPlayerColor(displayedPlayerId)}
-          playerId={displayedPlayerId}
-          isInteractive={displayedPlayerId === currentPlayerId}
-          viewerPlayerId={currentPlayerId}
-        />
-
-        {/* Bottom Control Strip - Hand + Deck + Life/Buttons Column */}
+      ) : (
+        /* Compact Layout - Current/Viewed Player Only */
         <div
           style={{
-            flexShrink: 0,
-            borderTop: '2px solid #ddd',
-            backgroundColor: '#f5f5f5',
-            padding: '0.75rem 1rem',
-            display: 'grid',
-            gridTemplateColumns: '1fr auto auto',
-            gap: '1rem',
-            alignItems: 'center',
+            flex: 1,
+            overflow: 'hidden',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          {/* Hand Zone */}
-          <div style={{ minWidth: 0, overflow: 'visible' }}>
+          {/* Battlefield - Takes remaining space */}
+          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <Zone
-              zoneId={`hand-${displayedPlayerId}`}
-              zoneName="Hand"
-              zoneType="hand"
-              cards={getZoneCards(`hand-${displayedPlayerId}`)}
+              zoneId={`battlefield-${displayedPlayerId}`}
+              zoneName="Battlefield"
+              zoneType="battlefield"
+              cards={getZoneCards(`battlefield-${displayedPlayerId}`)}
               playerColor={getPlayerColor(displayedPlayerId)}
               playerId={displayedPlayerId}
               isInteractive={displayedPlayerId === currentPlayerId}
@@ -444,154 +452,207 @@ function App() {
             />
           </div>
 
-          {/* Control Panel - Only show for current player */}
-          {currentPlayer && displayedPlayerId === currentPlayerId && (
-            <>
-              {/* Deck */}
-              <CompactDeck
-                cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
+          {/* Bottom Control Strip - Hand + Deck + Life/Buttons Column */}
+          <div
+            style={{
+              flexShrink: 0,
+              borderTop: '2px solid #ddd',
+              backgroundColor: '#f5f5f5',
+              padding: '0.75rem 1rem',
+              display: 'grid',
+              gridTemplateColumns: '1fr auto auto',
+              gap: '1rem',
+              alignItems: 'center',
+            }}
+          >
+            {/* Hand Zone */}
+            <div style={{ minWidth: 0, overflow: 'visible' }}>
+              <Zone
+                zoneId={`hand-${displayedPlayerId}`}
+                zoneName="Hand"
+                zoneType="hand"
+                cards={getZoneCards(`hand-${displayedPlayerId}`)}
                 playerColor={getPlayerColor(displayedPlayerId)}
                 playerId={displayedPlayerId}
-                revealedCard={revealedCard}
-                onDrawOne={() => drawCards(displayedPlayerId, 1)}
-                onDrawN={(count) => drawCards(displayedPlayerId, count)}
-                onMillOne={() => millCards(displayedPlayerId, 1)}
-                onMillN={(count) => millCards(displayedPlayerId, count)}
-                onExileOne={(faceDown) => exileFromDeck(displayedPlayerId, 1, faceDown)}
-                onExileN={(count, faceDown) => exileFromDeck(displayedPlayerId, count, faceDown)}
-                onRevealTop={() => {
-                  revealTopCard(displayedPlayerId)
-                }}
-                onShuffle={() => shuffleDeck(displayedPlayerId)}
+                isInteractive={displayedPlayerId === currentPlayerId}
+                viewerPlayerId={currentPlayerId}
               />
+            </div>
 
-              {/* Life Counter + Buttons Column */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
-              >
-                {/* Life Counter */}
-                <CompactLifeCounter
-                  playerId={displayedPlayerId}
-                  lifeTotal={currentPlayer.lifeTotal}
+            {/* Control Panel - Only show for current player */}
+            {currentPlayer && displayedPlayerId === currentPlayerId && (
+              <>
+                {/* Deck */}
+                <CompactDeck
+                  cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
                   playerColor={getPlayerColor(displayedPlayerId)}
-                  currentPlayerId={currentPlayerId}
+                  playerId={displayedPlayerId}
+                  revealedCard={revealedCard}
+                  onDrawOne={() => drawCards(displayedPlayerId, 1)}
+                  onDrawN={(count) => drawCards(displayedPlayerId, count)}
+                  onMillOne={() => millCards(displayedPlayerId, 1)}
+                  onMillN={(count) => millCards(displayedPlayerId, count)}
+                  onExileOne={(faceDown) => exileFromDeck(displayedPlayerId, 1, faceDown)}
+                  onExileN={(count, faceDown) => exileFromDeck(displayedPlayerId, count, faceDown)}
+                  onRevealTop={() => {
+                    revealTopCard(displayedPlayerId)
+                  }}
+                  onShuffle={() => shuffleDeck(displayedPlayerId)}
                 />
 
-                {/* Buttons Row */}
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {/* Graveyard Button */}
-                  <button
-                    onClick={() => setIsGraveyardOpen(!isGraveyardOpen)}
-                    style={{
-                      width: '50px',
-                      height: '40px',
-                      borderRadius: '6px',
-                      backgroundColor: '#757575',
-                      color: 'white',
-                      border: 'none',
-                      fontSize: '1.25rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#616161'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#757575'
-                    }}
-                    title="Graveyard"
-                  >
-                    💀
-                  </button>
+                {/* Life Counter + Buttons Column */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                  }}
+                >
+                  {/* Life Counter */}
+                  <CompactLifeCounter
+                    playerId={displayedPlayerId}
+                    lifeTotal={currentPlayer.lifeTotal}
+                    playerColor={getPlayerColor(displayedPlayerId)}
+                    currentPlayerId={currentPlayerId}
+                  />
 
-                  {/* Exile Button */}
-                  <button
-                    onClick={() => setIsExileOpen(!isExileOpen)}
-                    style={{
-                      width: '50px',
-                      height: '40px',
-                      borderRadius: '6px',
-                      backgroundColor: '#9C27B0',
-                      color: 'white',
-                      border: 'none',
-                      fontSize: '1.25rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7B1FA2'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#9C27B0'
-                    }}
-                    title="Exile"
-                  >
-                    🚫
-                  </button>
+                  {/* Quick Action Buttons Grid */}
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {/* Graveyard Button */}
+                    <button
+                      onClick={() => setIsGraveyardOpen(!isGraveyardOpen)}
+                      style={{
+                        width: '50px',
+                        height: '40px',
+                        borderRadius: '6px',
+                        backgroundColor: '#9C27B0',
+                        color: 'white',
+                        border: 'none',
+                        fontSize: '1.25rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#7B1FA2'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#9C27B0'
+                      }}
+                      title="Graveyard"
+                    >
+                      💀
+                    </button>
 
-                  {/* Token Button */}
-                  <button
-                    onClick={() => setIsTokenModalOpen(!isTokenModalOpen)}
-                    style={{
-                      width: '50px',
-                      height: '40px',
-                      borderRadius: '6px',
-                      backgroundColor: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      fontSize: '1.25rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F57C00'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#FF9800'
-                    }}
-                    title="Create Tokens"
-                  >
-                    🪙
-                  </button>
+                    {/* Exile Button */}
+                    <button
+                      onClick={() => setIsExileOpen(!isExileOpen)}
+                      style={{
+                        width: '50px',
+                        height: '40px',
+                        borderRadius: '6px',
+                        backgroundColor: '#9C27B0',
+                        color: 'white',
+                        border: 'none',
+                        fontSize: '1.25rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#7B1FA2'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#9C27B0'
+                      }}
+                      title="Exile"
+                    >
+                      🚫
+                    </button>
 
-                  {/* Chat Button */}
-                  <button
-                    onClick={() => setIsChatOpen(!isChatOpen)}
-                    style={{
-                      width: '50px',
-                      height: '40px',
-                      borderRadius: '6px',
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      fontSize: '1.25rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#388E3C'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#4CAF50'
-                    }}
-                    title="Chat & Log"
-                  >
-                    💬
-                  </button>
+                    {/* Token Button */}
+                    <button
+                      onClick={() => setIsTokenModalOpen(!isTokenModalOpen)}
+                      style={{
+                        width: '50px',
+                        height: '40px',
+                        borderRadius: '6px',
+                        backgroundColor: '#FF9800',
+                        color: 'white',
+                        border: 'none',
+                        fontSize: '1.25rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F57C00'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FF9800'
+                      }}
+                      title="Create Tokens"
+                    >
+                      🪙
+                    </button>
+
+                    {/* Chat Button */}
+                    <button
+                      onClick={() => setIsChatOpen(!isChatOpen)}
+                      style={{
+                        width: '50px',
+                        height: '40px',
+                        borderRadius: '6px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        fontSize: '1.25rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#388E3C'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#4CAF50'
+                      }}
+                      title="Chat & Log"
+                    >
+                      💬
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Graveyard and Exile Overlays - Only in compact mode */}
+      {layoutMode === 'compact' && (
+        <>
+          <GraveyardOverlay
+            isOpen={isGraveyardOpen}
+            onClose={() => setIsGraveyardOpen(false)}
+            cards={getZoneCards(`graveyard-${displayedPlayerId}`)}
+            playerColor={getPlayerColor(displayedPlayerId)}
+            playerId={displayedPlayerId}
+            isInteractive={displayedPlayerId === currentPlayerId}
+            viewerPlayerId={currentPlayerId}
+          />
+
+          <ExileOverlay
+            isOpen={isExileOpen}
+            onClose={() => setIsExileOpen(false)}
+            cards={getZoneCards(`exile-${displayedPlayerId}`)}
+            playerColor={getPlayerColor(displayedPlayerId)}
+            playerId={displayedPlayerId}
+            isInteractive={displayedPlayerId === currentPlayerId}
+            viewerPlayerId={currentPlayerId}
+          />
+        </>
+      )}
 
       {/* Chat Overlay */}
       <ChatOverlay
