@@ -21,7 +21,7 @@ export function DeckOverlay({
 }: DeckOverlayProps) {
   const isOwnDeck = playerId === viewerPlayerId
   const isRevealedByThisPlayer = revealedCard?.revealedBy === playerId
-  
+
   return (
     <div
       style={{
@@ -119,7 +119,7 @@ export function DeckOverlay({
             {cards.map(({ id, card }, index) => {
               const isTopCard = index === 0
               const showFaceUp = isTopCard && isRevealedByThisPlayer
-              
+
               return (
                 <div
                   key={id}

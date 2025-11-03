@@ -112,7 +112,7 @@ export function Zone({
     // After scaling, we want the content center to align with the container center
     const containerCenterX = containerWidth / 2
     const containerCenterY = containerHeight / 2
-    
+
     let translateX = containerCenterX - contentCenterX * scale
     const translateY = containerCenterY - contentCenterY * scale
 
@@ -600,7 +600,7 @@ export function Zone({
               position: 'relative',
               width: '100%',
               height: '100%',
-              transform: isOpponentBattlefield 
+              transform: isOpponentBattlefield
                 ? autoZoomTransform
                 : (opponentPosition === 'top' ? 'scaleX(-1)' : 'none'),
               transformOrigin: '0 0',

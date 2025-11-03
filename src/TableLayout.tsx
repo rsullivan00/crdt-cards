@@ -38,9 +38,9 @@ export function TableLayout({
   // Arrange players: current player at bottom, others distributed
   const currentPlayerData = players.find(p => p.id === currentPlayerId)
   const otherPlayers = players.filter(p => p.id !== currentPlayerId)
-  
+
   const playerCount = players.length
-  
+
   // Determine layout based on player count
   const getLayout = () => {
     if (playerCount === 1) {

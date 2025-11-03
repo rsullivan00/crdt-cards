@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NumberInputModal } from './NumberInputModal'
 import { ScryPeekModal } from './ScryPeekModal'
-import { Card, getTopCards, reorderTopCards } from './store'
+import { Card, getTopCards, getAllDeckCards, reorderTopCards } from './store'
 import { useCardImage } from './hooks/useCardImage'
 
 interface CompactDeckProps {
@@ -535,7 +535,7 @@ export function CompactDeck({
                 if (cardCount > 0) e.currentTarget.style.backgroundColor = 'white'
               }}
             >
-              <span>Peek ▶</span>
+              <span>View ▶</span>
             </div>
 
             {/* Reveal Top Card */}
@@ -884,7 +884,7 @@ export function CompactDeck({
                 borderRadius: '6px',
                 boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
                 zIndex: 10000,
-                minWidth: '150px',
+                minWidth: '180px',
               }}
               onMouseEnter={() => setShowPeekSubmenu(true)}
               onMouseLeave={() => {
@@ -909,13 +909,13 @@ export function CompactDeck({
                   e.currentTarget.style.backgroundColor = 'white'
                 }}
               >
-                → Peek 1
+                → View 1
               </div>
               <div
-                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                style={menuItemStyle}
                 onClick={() => {
                   setNumberModal({
-                    title: 'Peek at how many cards?',
+                    title: 'View how many cards?',
                     onConfirm: (n) => {
                       const cards = getTopCards(playerId, n)
                       if (cards.length > 0) {
@@ -934,7 +934,26 @@ export function CompactDeck({
                   e.currentTarget.style.backgroundColor = 'white'
                 }}
               >
-                → Peek N
+                → View N
+              </div>
+              <div
+                style={{ ...menuItemStyle, borderBottom: 'none' }}
+                onClick={() => {
+                  const cards = getAllDeckCards(playerId)
+                  if (cards.length > 0) {
+                    setScryPeekModal({ cards, mode: 'peek' })
+                    setShowMenu(false)
+                    setShowPeekSubmenu(false)
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                → View Whole Deck
               </div>
             </div>
           )}
@@ -957,6 +976,7 @@ export function CompactDeck({
         <ScryPeekModal
           cards={scryPeekModal.cards}
           mode={scryPeekModal.mode}
+          playerId={playerId}
           onConfirm={
             scryPeekModal.mode === 'scry'
               ? (topCardIds, bottomCardIds) => {

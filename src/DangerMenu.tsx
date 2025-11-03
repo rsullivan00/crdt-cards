@@ -38,7 +38,7 @@ export function DangerMenu({
       >
         ⚠️ <span style={{ fontSize: '0.6rem' }}>▼</span>
       </button>
-      
+
       {isOpen && (
         <div
           style={{
@@ -79,7 +79,7 @@ export function DangerMenu({
           >
             🚪 Leave Game
           </button>
-          
+
           <button
             onClick={() => setRemovePlayerMenuOpen(!removePlayerMenuOpen)}
             style={{
@@ -106,7 +106,7 @@ export function DangerMenu({
             <span>👤 Remove Player</span>
             <span style={{ fontSize: '0.7rem' }}>{removePlayerMenuOpen ? '▲' : '▼'}</span>
           </button>
-          
+
           {removePlayerMenuOpen && (
             <div style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
               {players.filter(p => p.id !== currentPlayerId).map(({ id, player }) => (
@@ -139,7 +139,7 @@ export function DangerMenu({
               ))}
             </div>
           )}
-          
+
           <button
             onClick={() => {
               onResetRoom()

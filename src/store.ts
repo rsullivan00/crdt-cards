@@ -790,6 +790,25 @@ export function getTopCards(playerId: string, count: number): Array<{ cardId: st
 }
 
 /**
+ * Get all cards in the deck
+ */
+export function getAllDeckCards(playerId: string): Array<{ cardId: string; card: Card }> {
+  const deckZoneId = `deck-${playerId}`
+  const deckCards = getCardsInZone(deckZoneId)
+
+  const result: Array<{ cardId: string; card: Card }> = []
+
+  for (const card of deckCards) {
+    const cardId = Array.from(cardsMap.entries()).find(([_, c]) => c === card)?.[0]
+    if (cardId) {
+      result.push({ cardId, card })
+    }
+  }
+
+  return result
+}
+
+/**
  * Reorder top cards of deck (for scry)
  * @param playerId - The player performing the scry
  * @param topCardIds - Array of card IDs in the new order (top to bottom)

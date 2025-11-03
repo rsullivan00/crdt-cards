@@ -44,11 +44,11 @@ export function PlayerQuadrant({
 }: PlayerQuadrantProps) {
   const playerColor = getPlayerColor(playerId)
   const isInteractive = isCurrentPlayer
-  
+
   // Opponents should only show battlefield (no hand/deck controls)
   // Only current player shows full controls
   const showFullControls = isCurrentPlayer
-  
+
   return (
     <div
       style={{
@@ -85,7 +85,7 @@ export function PlayerQuadrant({
           {player.name} {isCurrentPlayer && '(You)'}
           {isCurrentTurn && ' 🎯'}
         </div>
-        
+
         {/* Opponent stats and zone buttons */}
         {!isCurrentPlayer && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -165,7 +165,7 @@ export function PlayerQuadrant({
       >
         {/* For opponents at top: Hand first, then battlefield */}
         {/* For current player: Battlefield first, then hand+controls */}
-        
+
         {!showFullControls ? (
           /* Opponent layout - battlefield only */
           <>

@@ -72,13 +72,13 @@ function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [viewingOpponentId, setViewingOpponentId] = useState<string | null>(null)
   const [revealedCard, setRevealedCard] = useState<{ cardName: string; revealedBy: string } | null>(null)
-  
+
   // Layout mode state
   const [layoutMode, setLayoutMode] = useState<'compact' | 'table'>(() => {
     const saved = localStorage.getItem('crdt-cards-layout-mode')
     return (saved === 'table' ? 'table' : 'compact') as 'compact' | 'table'
   })
-  
+
   const toggleLayoutMode = () => {
     const newMode = layoutMode === 'compact' ? 'table' : 'compact'
     setLayoutMode(newMode)
@@ -250,7 +250,7 @@ function App() {
 
   const handleLeaveGame = () => {
     if (!currentPlayerId) return
-    
+
     setConfirmDialog({
       message: 'Leave this game? Your player and cards will be removed.',
       onConfirm: () => {

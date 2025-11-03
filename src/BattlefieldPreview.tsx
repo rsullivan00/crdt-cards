@@ -56,7 +56,7 @@ export const BattlefieldPreview = memo(function BattlefieldPreview({
     // Calculate translation to center the content
     const containerCenterX = containerWidth / 2
     const containerCenterY = containerHeight / 2
-    
+
     const translateX = containerCenterX - contentCenterX * scale
     const translateY = containerCenterY - contentCenterY * scale
 

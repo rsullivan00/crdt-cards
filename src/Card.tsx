@@ -159,8 +159,8 @@ export function Card({
     padding: '0.5rem',
     position: 'relative',
     transition: 'transform 0.3s ease',
-    transform: opponentPosition === 'top' 
-      ? `scaleX(-1) rotate(180deg) rotate(${card.tapped ? 90 : 0}deg)` 
+    transform: opponentPosition === 'top'
+      ? `scaleX(-1) rotate(180deg) rotate(${card.tapped ? 90 : 0}deg)`
       : `rotate(${card.tapped ? 90 : 0}deg)`,
     cursor: isInteractive ? 'pointer' : 'default',
     display: 'flex',
@@ -830,11 +830,11 @@ export function Card({
                 style={menuItemStyle}
                 onClick={(e) => {
                   e.stopPropagation()
-                  
+
                   // Use the captured selection state from when menu opened
                   const currentlySelected = menuSelectedCards.has(cardId)
                   const newFaceDownState = !card.faceDown
-                  
+
                   if (currentlySelected && menuSelectedCards.size > 1) {
                     // Apply to all selected cards
                     menuSelectedCards.forEach(selectedCardId => {
@@ -844,7 +844,7 @@ export function Card({
                     // Apply to just this card
                     setCardFaceDown(cardId, newFaceDownState, playerId)
                   }
-                  
+
                   setShowMenu(false)
                 }}
                 onMouseEnter={(e) => {
