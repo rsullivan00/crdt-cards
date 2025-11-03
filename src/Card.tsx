@@ -448,7 +448,9 @@ export function Card({
           overflow: 'hidden',
           opacity: isDragging ? 0.5 : 1,
           cursor: isInteractive ? 'grab' : 'default',
-          border: isSelected ? '4px solid #2196F3' : 'none',
+          border: 'none',
+          outline: isSelected ? '4px solid #2196F3' : 'none',
+          outlineOffset: '-4px',
           boxShadow: isSelected ? '0 0 12px rgba(33, 150, 243, 0.8)' : 'none',
         }}
         title={!cardIsFaceDown || card.owner === playerId ? card.oracleId : undefined}
