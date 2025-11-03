@@ -32,7 +32,7 @@ import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DangerMenu } from './DangerMenu'
-import { OpponentBar } from './OpponentBar'
+import { CompactPlayerBar } from './CompactPlayerBar'
 import { ChatOverlay } from './ChatOverlay'
 import { GraveyardOverlay } from './GraveyardOverlay'
 import { ExileOverlay } from './ExileOverlay'
@@ -242,6 +242,10 @@ function App() {
     }
   }
 
+  // Get current turn player ID
+  const turnBaton = getTurnBaton()
+  const currentTurnPlayerId = turnBaton?.playerId || null
+
   // Removed handleRemovePlayer - functionality not currently used in UI
 
   const handleLeaveGame = () => {
@@ -307,16 +311,27 @@ function App() {
   const displayedPlayerId = viewingOpponentId || currentPlayerId
 
   return (
-    <div
-      style={{
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        height: '100vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#e0e0e0',
-      }}
-    >
+    <>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+      `}</style>
+      <div
+        style={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          height: '100vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#e0e0e0',
+        }}
+      >
       {/* Header - Compact */}
       <div
         style={{
@@ -408,10 +423,11 @@ function App() {
 
       {/* Opponent Bar - Only show in compact mode */}
       {layoutMode === 'compact' && (
-        <OpponentBar
+        <CompactPlayerBar
           players={players}
           currentPlayerId={currentPlayerId}
           viewingPlayerId={viewingOpponentId || currentPlayerId}
+          currentTurnPlayerId={currentTurnPlayerId}
           onSelectPlayer={(playerId) => {
             // If clicking on current player, reset to their view
             if (playerId === currentPlayerId) {
@@ -420,6 +436,7 @@ function App() {
               setViewingOpponentId(playerId)
             }
           }}
+          getZoneCards={getZoneCards}
         />
       )}
 
@@ -714,6 +731,7 @@ function App() {
         onClose={() => setIsHelpOpen(false)}
       />
     </div>
+    </>
   )
 }
 
