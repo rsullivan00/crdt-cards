@@ -7,6 +7,7 @@ import {
   revealedCardMap,
   addPlayer,
   resetRoom,
+  removePlayer,
   drawCards,
   millCards,
   exileFromDeck,
@@ -30,6 +31,7 @@ import {
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
+import { DangerMenu } from './DangerMenu'
 import { OpponentBar } from './OpponentBar'
 import { ChatOverlay } from './ChatOverlay'
 import { GraveyardOverlay } from './GraveyardOverlay'
@@ -242,6 +244,30 @@ function App() {
 
   // Removed handleRemovePlayer - functionality not currently used in UI
 
+  const handleLeaveGame = () => {
+    if (!currentPlayerId) return
+    
+    setConfirmDialog({
+      message: 'Leave this game? Your player and cards will be removed.',
+      onConfirm: () => {
+        removePlayer(currentPlayerId)
+        const storageKey = `crdt-cards-player-${getRoomName()}`
+        localStorage.removeItem(storageKey)
+        window.location.reload()
+      },
+    })
+  }
+
+  const handleRemoveOtherPlayer = (playerId: string) => {
+    const player = playersMap.get(playerId)
+    setConfirmDialog({
+      message: `Remove ${player?.name || 'this player'} from the game? Their cards will be removed.`,
+      onConfirm: () => {
+        removePlayer(playerId)
+      },
+    })
+  }
+
   const handleResetRoom = () => {
     setConfirmDialog({
       message: 'Reset the entire room? This will clear all players, cards, and game state.',
@@ -370,20 +396,13 @@ function App() {
               backgroundColor: connected && synced ? '#4CAF50' : '#FF9800',
             }}
           />
-          <button
-            onClick={handleResetRoom}
-            style={{
-              padding: '0.5rem 0.75rem',
-              fontSize: '0.75rem',
-              backgroundColor: '#F44336',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Reset
-          </button>
+          <DangerMenu
+            currentPlayerId={currentPlayerId || ''}
+            players={players}
+            onLeaveGame={handleLeaveGame}
+            onRemovePlayer={handleRemoveOtherPlayer}
+            onResetRoom={handleResetRoom}
+          />
         </div>
       </div>
 
