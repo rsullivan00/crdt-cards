@@ -624,7 +624,7 @@ export function Zone({
                   key={id}
                   cardId={id}
                   card={card}
-                  playerId={playerId}
+                  playerId={viewerPlayerId || playerId}
                   isInteractive={isInteractive}
                   forceFaceDown={false}
                   opponentPosition={opponentPosition}
@@ -762,7 +762,7 @@ export function Zone({
                   key={id}
                   cardId={id}
                   card={card}
-                  playerId={playerId}
+                  playerId={viewerPlayerId || playerId}
                   isInteractive={isInteractive}
                   forceFaceDown={shouldHideCard}
                 />

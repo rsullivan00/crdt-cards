@@ -470,7 +470,7 @@ export function Card({
           outlineOffset: '-4px',
           boxShadow: isSelected ? '0 0 12px rgba(33, 150, 243, 0.8)' : 'none',
         }}
-        title={!cardIsFaceDown || card.owner === playerId ? card.oracleId : undefined}
+        title={cardIsFaceDown && card.owner !== playerId ? undefined : card.oracleId}
         draggable={isInteractive}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -517,7 +517,7 @@ export function Card({
         ) : imageUrl ? (
           <img
             src={imageUrl}
-            alt={card.oracleId}
+            alt={cardIsFaceDown && card.owner !== playerId ? 'Card back' : card.oracleId}
             style={{
               width: '100%',
               height: '100%',
@@ -544,10 +544,10 @@ export function Card({
                 wordBreak: 'break-all',
               }}
             >
-              {card.oracleId}
+              {cardIsFaceDown && card.owner !== playerId ? 'Card back' : card.oracleId}
             </div>
             <div style={{ fontSize: '0.65rem', color: '#666' }}>
-              No image
+              {cardIsFaceDown && card.owner !== playerId ? '' : 'No image'}
             </div>
           </div>
         )}
@@ -1437,7 +1437,7 @@ export function Card({
           >
             <img
               src={imageUrl}
-              alt={card.oracleId}
+              alt={cardIsFaceDown && card.owner !== playerId ? 'Card back' : card.oracleId}
               style={{
                 width: '100%',
                 height: '680px',
