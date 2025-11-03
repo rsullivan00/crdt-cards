@@ -45,8 +45,9 @@ export function PlayerQuadrant({
   const playerColor = getPlayerColor(playerId)
   const isInteractive = isCurrentPlayer
   
-  // Opponents at the top should show hand at top, battlefield below (reverse of current player)
-  const isOpponentAtTop = position === 'top' && !isCurrentPlayer
+  // Opponents should only show battlefield (no hand/deck controls)
+  // Only current player shows full controls
+  const showFullControls = isCurrentPlayer
   
   return (
     <div
@@ -165,8 +166,8 @@ export function PlayerQuadrant({
         {/* For opponents at top: Hand first, then battlefield */}
         {/* For current player: Battlefield first, then hand+controls */}
         
-        {isOpponentAtTop ? (
-          /* Opponent at top layout */
+        {!showFullControls ? (
+          /* Opponent layout - battlefield only */
           <>
             {/* Battlefield Zone (directly under header) */}
             <div

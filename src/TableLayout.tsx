@@ -68,12 +68,15 @@ export function TableLayout({
         right: otherPlayers[1],
       }
     } else {
-      // Four players - full quadrants
+      // Four players - 2x2 grid
+      // Top-left: opponent 0, Top-right: opponent 1
+      // Bottom-left: current player, Bottom-right: opponent 2
       return {
         bottom: currentPlayerData,
-        top: otherPlayers[1],
+        top: null, // No spanning top for 4 players
         left: otherPlayers[0],
-        right: otherPlayers[2],
+        right: otherPlayers[1],
+        bottomRight: otherPlayers[2], // 4th player goes bottom-right
       }
     }
   }
@@ -84,6 +87,7 @@ export function TableLayout({
   // For 3+ players: use grid
   const isTwoPlayerLayout = playerCount === 2
   const isThreePlayerLayout = playerCount === 3
+  const isFourPlayerLayout = playerCount === 4
 
   return (
     <div
@@ -202,7 +206,7 @@ export function TableLayout({
       {layout.bottom && (
         <div
           style={{
-            gridColumn: isTwoPlayerLayout ? '1' : '1 / 3',
+            gridColumn: isTwoPlayerLayout || isFourPlayerLayout ? '1' : '1 / 3',
             gridRow: '2',
           }}
         >
@@ -223,6 +227,36 @@ export function TableLayout({
             onOpenDeck={() => onOpenDeck(layout.bottom!.id)}
             onCreateToken={() => onCreateToken(layout.bottom!.id)}
             isCurrentTurn={currentTurnPlayerId === layout.bottom.id}
+            revealedCard={revealedCard}
+          />
+        </div>
+      )}
+
+      {/* Bottom-Right Section - 4th player (only in 4-player games) */}
+      {isFourPlayerLayout && (layout as any).bottomRight && (
+        <div
+          style={{
+            gridColumn: '2',
+            gridRow: '2',
+          }}
+        >
+          <PlayerQuadrant
+            playerId={(layout as any).bottomRight.id}
+            player={(layout as any).bottomRight.player}
+            currentPlayerId={currentPlayerId}
+            isCurrentPlayer={false}
+            position="right"
+            getZoneCards={getZoneCards}
+            onDrawCards={(count) => onDrawCards((layout as any).bottomRight.id, count)}
+            onMillCards={(count) => onMillCards((layout as any).bottomRight.id, count)}
+            onExileFromDeck={(count, faceDown) => onExileFromDeck((layout as any).bottomRight.id, count, faceDown)}
+            onShuffleDeck={() => onShuffleDeck((layout as any).bottomRight.id)}
+            onRevealTopCard={() => onRevealTopCard((layout as any).bottomRight.id)}
+            onOpenGraveyard={() => onOpenGraveyard((layout as any).bottomRight.id)}
+            onOpenExile={() => onOpenExile((layout as any).bottomRight.id)}
+            onOpenDeck={() => onOpenDeck((layout as any).bottomRight.id)}
+            onCreateToken={() => onCreateToken((layout as any).bottomRight.id)}
+            isCurrentTurn={currentTurnPlayerId === (layout as any).bottomRight.id}
             revealedCard={revealedCard}
           />
         </div>
