@@ -186,6 +186,7 @@ export function PlayerQuadrant({
                 playerId={playerId}
                 isInteractive={isInteractive}
                 viewerPlayerId={currentPlayerId}
+                opponentPosition={position === 'top' ? 'top' : null}
               />
             </div>
           </>

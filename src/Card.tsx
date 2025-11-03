@@ -25,6 +25,7 @@ interface CardProps {
   playerId: string;
   isInteractive?: boolean;
   forceFaceDown?: boolean;
+  opponentPosition?: 'top' | 'left' | 'right' | null;
 }
 
 export function Card({
@@ -33,6 +34,7 @@ export function Card({
   playerId,
   isInteractive = true,
   forceFaceDown = false,
+  opponentPosition = null,
 }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
@@ -157,7 +159,9 @@ export function Card({
     padding: '0.5rem',
     position: 'relative',
     transition: 'transform 0.3s ease',
-    transform: `rotate(${card.tapped ? 90 : 0}deg)`,
+    transform: opponentPosition === 'top' 
+      ? `scaleX(-1) rotate(180deg) rotate(${card.tapped ? 90 : 0}deg)` 
+      : `rotate(${card.tapped ? 90 : 0}deg)`,
     cursor: isInteractive ? 'pointer' : 'default',
     display: 'flex',
     flexDirection: 'column',

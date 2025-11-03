@@ -137,7 +137,7 @@ export function TableLayout({
                 player={layout.left.player}
                 currentPlayerId={currentPlayerId}
                 isCurrentPlayer={false}
-                position={isThreePlayerLayout ? 'top' : 'left'}
+                position='top'
                 getZoneCards={getZoneCards}
                 onDrawCards={(count) => onDrawCards(layout.left!.id, count)}
                 onMillCards={(count) => onMillCards(layout.left!.id, count)}
@@ -160,7 +160,7 @@ export function TableLayout({
                 player={layout.right.player}
                 currentPlayerId={currentPlayerId}
                 isCurrentPlayer={false}
-                position={isThreePlayerLayout ? 'top' : 'right'}
+                position='top'
                 getZoneCards={getZoneCards}
                 onDrawCards={(count) => onDrawCards(layout.right!.id, count)}
                 onMillCards={(count) => onMillCards(layout.right!.id, count)}

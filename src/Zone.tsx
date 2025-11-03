@@ -17,6 +17,7 @@ interface ZoneProps {
   viewerPlayerId?: string
   zoneId: string
   showHeader?: boolean
+  opponentPosition?: 'top' | 'left' | 'right' | null
 }
 
 export function Zone({
@@ -33,6 +34,7 @@ export function Zone({
   viewerPlayerId,
   zoneId,
   showHeader = true,
+  opponentPosition = null,
 }: ZoneProps) {
   const [numberModal, setNumberModal] = useState<{
     title: string
@@ -111,11 +113,25 @@ export function Zone({
     const containerCenterX = containerWidth / 2
     const containerCenterY = containerHeight / 2
     
-    const translateX = containerCenterX - contentCenterX * scale
+    let translateX = containerCenterX - contentCenterX * scale
     const translateY = containerCenterY - contentCenterY * scale
 
-    // Combine scale and translate
-    setAutoZoomTransform(`translate(${translateX}px, ${translateY}px) scale(${scale})`)
+    // If we're going to flip horizontally, adjust translateX
+    // With transformOrigin '0 0' and transforms applied right-to-left:
+    // translate(X,Y) scale(S) scaleX(-1) means: flip, then scale, then translate
+    // After scaleX(-1) around origin 0,0: position x becomes -x
+    // After scaling: -x becomes -x * scale
+    // After translating: position becomes translateX + (-x * scale)
+    // We want: containerCenterX = translateX + (-contentCenterX * scale)
+    // Solving: translateX = containerCenterX + contentCenterX * scale
+    if (opponentPosition === 'top') {
+      translateX = containerCenterX + contentCenterX * scale
+    }
+
+    // Combine scale and translate (scaleX will be added in the style if needed)
+    const baseTransform = `translate(${translateX}px, ${translateY}px) scale(${scale})`
+    const flipTransform = opponentPosition === 'top' ? `${baseTransform} scaleX(-1)` : baseTransform
+    setAutoZoomTransform(flipTransform)
   }, [isOpponentBattlefield, cards, playerId, viewerPlayerId, containerSize])
 
 
@@ -584,7 +600,9 @@ export function Zone({
               position: 'relative',
               width: '100%',
               height: '100%',
-              transform: isOpponentBattlefield ? autoZoomTransform : 'none',
+              transform: isOpponentBattlefield 
+                ? autoZoomTransform
+                : (opponentPosition === 'top' ? 'scaleX(-1)' : 'none'),
               transformOrigin: '0 0',
               transition: 'transform 0.3s ease',
             }}
@@ -609,6 +627,7 @@ export function Zone({
                   playerId={playerId}
                   isInteractive={isInteractive}
                   forceFaceDown={false}
+                  opponentPosition={opponentPosition}
                 />
               ))
             )}
