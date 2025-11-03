@@ -22,7 +22,6 @@ export interface Card {
   order: number // sortable key inside zone (supports stable deck order) - also used as z-index for battlefield
   faceDown: boolean
   tapped: boolean
-  upsideDown: boolean // rotated 180 degrees (for battlefield/exile cards)
   counters: { [key: string]: number } // e.g., { '+1/+1': 3, 'loyalty': 4 }
   attachments: string[] // array of cardIds (auras/equipment)
   metadata: { [key: string]: any } // tokens, notes, etc.
@@ -70,6 +69,96 @@ export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle s
 export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
 export const counterTypesMap = ydoc.getMap<boolean>('counterTypes') // Track counter types used in this room
 export const revealedCardMap = ydoc.getMap<{ cardName: string; revealedBy: string; timestamp: number }>('revealedCard') // Currently revealed card
+
+// ============================================================================
+// LOCAL SELECTION STATE (not synced via CRDT)
+// ============================================================================
+
+// Track selected card IDs (local to this client only)
+const selectedCardIds = new Set<string>()
+const selectionListeners: Array<() => void> = []
+
+/**
+ * Get all currently selected card IDs
+ */
+export function getSelectedCardIds(): Set<string> {
+  return new Set(selectedCardIds)
+}
+
+/**
+ * Check if a card is selected
+ */
+export function isCardSelected(cardId: string): boolean {
+  return selectedCardIds.has(cardId)
+}
+
+/**
+ * Toggle card selection
+ */
+export function toggleCardSelection(cardId: string): void {
+  if (selectedCardIds.has(cardId)) {
+    selectedCardIds.delete(cardId)
+  } else {
+    selectedCardIds.add(cardId)
+  }
+  notifySelectionListeners()
+}
+
+/**
+ * Select a card (add to selection)
+ */
+export function selectCard(cardId: string): void {
+  selectedCardIds.add(cardId)
+  notifySelectionListeners()
+}
+
+/**
+ * Deselect a card (remove from selection)
+ */
+export function deselectCard(cardId: string): void {
+  selectedCardIds.delete(cardId)
+  notifySelectionListeners()
+}
+
+/**
+ * Clear all selections
+ */
+export function clearSelection(): void {
+  selectedCardIds.clear()
+  notifySelectionListeners()
+}
+
+/**
+ * Select multiple cards
+ */
+export function selectCards(cardIds: string[]): void {
+  cardIds.forEach(id => selectedCardIds.add(id))
+  notifySelectionListeners()
+}
+
+/**
+ * Subscribe to selection changes
+ */
+export function observeSelection(callback: () => void): void {
+  selectionListeners.push(callback)
+}
+
+/**
+ * Unsubscribe from selection changes
+ */
+export function unobserveSelection(callback: () => void): void {
+  const index = selectionListeners.indexOf(callback)
+  if (index > -1) {
+    selectionListeners.splice(index, 1)
+  }
+}
+
+/**
+ * Notify all selection listeners
+ */
+function notifySelectionListeners(): void {
+  selectionListeners.forEach(callback => callback())
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -251,7 +340,6 @@ export function addCard(
     order,
     faceDown: false,
     tapped: false,
-    upsideDown: false,
     counters: {},
     attachments: [],
     metadata: {},
@@ -341,28 +429,6 @@ export function setCardTapped(cardId: string, tapped: boolean, playerId?: string
  */
 export function setCardFaceDown(cardId: string, faceDown: boolean, playerId?: string): void {
   updateCard(cardId, { faceDown }, playerId)
-}
-
-/**
- * Flip a card upside down or right-side up (180 degree rotation)
- */
-export function setCardUpsideDown(cardId: string, upsideDown: boolean, playerId?: string): void {
-  const card = cardsMap.get(cardId)
-  if (!card) return
-
-  cardsMap.set(cardId, {
-    ...card,
-    upsideDown,
-    v: card.v + 1,
-  })
-
-  if (playerId) {
-    logEvent(playerId, 'card_updated', {
-      cardId,
-      oracleId: card.oracleId,
-      updates: { upsideDown },
-    })
-  }
 }
 
 /**
@@ -955,7 +1021,6 @@ export function createToken(
       order: nextOrder + i,
       faceDown: false,
       tapped: false,
-      upsideDown: false,
       counters: {},
       attachments: [],
       metadata: { isToken: true, imageUrl },

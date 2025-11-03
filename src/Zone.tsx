@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Card as CardComponent } from './Card'
-import { Card as CardType, moveCardToZone, setCardPosition } from './store'
+import { Card as CardType, moveCardToZone, setCardPosition, selectCards, clearSelection } from './store'
 import { NumberInputModal } from './NumberInputModal'
 
 interface ZoneProps {
@@ -39,6 +39,9 @@ export function Zone({
     onConfirm: (value: number) => void
   } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null)
+  const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null)
   const battlefieldRef = useRef<HTMLDivElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -58,6 +61,7 @@ export function Zone({
     const cardId = e.dataTransfer.getData('cardId')
     const fromZoneId = e.dataTransfer.getData('fromZoneId')
     const dragPlayerId = e.dataTransfer.getData('playerId')
+    const selectedCardsData = e.dataTransfer.getData('selectedCards')
 
     // Only allow dropping your own cards
     if (dragPlayerId !== playerId) {
@@ -75,26 +79,148 @@ export function Zone({
 
       // Calculate position accounting for where the user grabbed the card
       // This makes the card appear exactly where the drag preview showed it
-      const x = e.clientX - rect.left - offsetX
-      const y = e.clientY - rect.top - offsetY
+      const baseX = e.clientX - rect.left - offsetX
+      const baseY = e.clientY - rect.top - offsetY
 
+      // Check if we're dragging multiple selected cards
+      if (selectedCardsData) {
+        try {
+          const selectedCards: { id: string; relativeX: number; relativeY: number }[] = JSON.parse(selectedCardsData)
+          
+          // Move all selected cards maintaining their relative positions
+          selectedCards.forEach(({ id, relativeX, relativeY }) => {
+            // If dropping from a different zone, move card first
+            const cardFromZone = e.dataTransfer.getData('fromZoneId')
+            if (cardFromZone !== zoneId) {
+              moveCardToZone(id, zoneId, 'auto', playerId)
+            }
+            
+            // Set position with relative offset
+            setCardPosition(id, baseX + relativeX, baseY + relativeY, playerId)
+          })
+          
+          // Keep selection active for additional operations
+          return
+        } catch (err) {
+          console.error('Failed to parse selected cards data:', err)
+          // Fall through to single card handling
+        }
+      }
+
+      // Single card handling (no selection)
       // If dropping from a different zone, move card first then set position
       if (fromZoneId !== zoneId) {
         moveCardToZone(cardId, zoneId, 'auto', playerId)
       }
 
       // Set the position (this will also update if already in battlefield)
-      setCardPosition(cardId, x, y, playerId)
+      setCardPosition(cardId, baseX, baseY, playerId)
       return
     }
 
-    // For other zones, don't do anything if dropping in the same zone
+    // For other zones (non-battlefield)
+    // Check if we're dragging multiple selected cards
+    if (selectedCardsData) {
+      try {
+        const selectedCards: { id: string; relativeX: number; relativeY: number }[] = JSON.parse(selectedCardsData)
+        
+        // Don't do anything if dropping in the same zone
+        if (fromZoneId !== zoneId) {
+          // Move all selected cards to this zone
+          selectedCards.forEach(({ id }) => {
+            moveCardToZone(id, zoneId, 'auto', playerId)
+          })
+        }
+        
+        // Keep selection active for additional operations
+        return
+      } catch (err) {
+        console.error('Failed to parse selected cards data:', err)
+        // Fall through to single card handling
+      }
+    }
+
+    // Single card handling - don't do anything if dropping in the same zone
     if (fromZoneId === zoneId) {
       return
     }
 
     // Move card to this zone
     moveCardToZone(cardId, zoneId, 'auto', playerId)
+  }
+
+  // Drag-to-select handlers for battlefield
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only enable for battlefield zone and left mouse button
+    if (zoneType !== 'battlefield' || e.button !== 0 || !battlefieldRef.current) return
+    
+    // Don't start selection if clicking on a card
+    const target = e.target as HTMLElement
+    if (target.closest('[data-card-id]')) return
+
+    const rect = battlefieldRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    setIsSelecting(true)
+    setSelectionStart({ x, y })
+    setSelectionEnd({ x, y })
+    
+    // Clear selection if not holding Ctrl
+    if (!e.ctrlKey && !e.metaKey) {
+      clearSelection()
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isSelecting || !battlefieldRef.current || !selectionStart) return
+
+    const rect = battlefieldRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    setSelectionEnd({ x, y })
+  }
+
+  const handleMouseUp = () => {
+    if (!isSelecting || !selectionStart || !selectionEnd || !battlefieldRef.current) {
+      setIsSelecting(false)
+      return
+    }
+
+    // Calculate selection rectangle
+    const minX = Math.min(selectionStart.x, selectionEnd.x)
+    const maxX = Math.max(selectionStart.x, selectionEnd.x)
+    const minY = Math.min(selectionStart.y, selectionEnd.y)
+    const maxY = Math.max(selectionStart.y, selectionEnd.y)
+
+    // Find cards within selection rectangle
+    const selectedCardIds: string[] = []
+    cards.forEach(({ id, card }) => {
+      if (!card.position) return
+
+      // Check if card center is within selection rectangle
+      const cardCenterX = card.position.x + 60 // Half of card width (120px)
+      const cardCenterY = card.position.y + 80 // Half of card height (160px)
+
+      if (
+        cardCenterX >= minX &&
+        cardCenterX <= maxX &&
+        cardCenterY >= minY &&
+        cardCenterY <= maxY
+      ) {
+        selectedCardIds.push(id)
+      }
+    })
+
+    // Select the cards
+    if (selectedCardIds.length > 0) {
+      selectCards(selectedCardIds)
+    }
+
+    setIsSelecting(false)
+    setSelectionStart(null)
+    setSelectionEnd(null)
   }
 
   // Deck zone gets special rendering
@@ -336,6 +462,15 @@ export function Zone({
             position: 'relative',
             flex: 1,
             minHeight: 0,
+            cursor: isSelecting ? 'crosshair' : 'default',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            if (isSelecting) {
+              handleMouseUp()
+            }
           }}
         >
           {cards.length === 0 ? (
@@ -360,6 +495,23 @@ export function Zone({
                 forceFaceDown={false}
               />
             ))
+          )}
+          
+          {/* Selection rectangle */}
+          {isSelecting && selectionStart && selectionEnd && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${Math.min(selectionStart.x, selectionEnd.x)}px`,
+                top: `${Math.min(selectionStart.y, selectionEnd.y)}px`,
+                width: `${Math.abs(selectionEnd.x - selectionStart.x)}px`,
+                height: `${Math.abs(selectionEnd.y - selectionStart.y)}px`,
+                border: '2px dashed #2196F3',
+                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                pointerEvents: 'none',
+                zIndex: 10000,
+              }}
+            />
           )}
         </div>
       </div>

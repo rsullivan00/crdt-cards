@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor } from './store'
+import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor, isCardSelected, toggleCardSelection, clearSelection, observeSelection, unobserveSelection, getSelectedCardIds, ydoc } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -50,6 +50,8 @@ export function Card({
   const [otherPlayers, setOtherPlayers] = useState<Array<{ id: string; name: string }>>([])
   const [isDragging, setIsDragging] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [isSelected, setIsSelected] = useState(false)
+  const [menuSelectedCards, setMenuSelectedCards] = useState<Set<string>>(new Set())
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const hoverTimeoutRef = useRef<number>()
@@ -108,11 +110,42 @@ export function Card({
     }
   }, [card.owner])
 
+  // Subscribe to selection changes
+  useEffect(() => {
+    const updateSelection = () => {
+      setIsSelected(isCardSelected(cardId))
+    }
+
+    observeSelection(updateSelection)
+    updateSelection()
+
+    return () => {
+      unobserveSelection(updateSelection)
+    }
+  }, [cardId])
+
   const handleAddCounterType = (counterType: string) => {
     // Record this counter type in the room history
     counterTypesMap.set(counterType, true)
-    // Add one counter of this type to the card
-    modifyCounters(cardId, counterType, 1, playerId)
+    
+    // Use the captured selection state from when menu opened
+    const currentlySelected = menuSelectedCards.has(cardId)
+    console.log('handleAddCounterType:', {
+      cardId,
+      counterType,
+      currentlySelected,
+      menuSelectedCardsSize: menuSelectedCards.size,
+      menuSelectedCardIds: Array.from(menuSelectedCards)
+    })
+    if (currentlySelected && menuSelectedCards.size > 1) {
+      console.log('Applying to multiple cards:', Array.from(menuSelectedCards))
+      menuSelectedCards.forEach(selectedCardId => {
+        modifyCounters(selectedCardId, counterType, 1, playerId)
+      })
+    } else {
+      console.log('Applying to single card:', cardId)
+      modifyCounters(cardId, counterType, 1, playerId)
+    }
   }
 
   const cardStyle: React.CSSProperties = {
@@ -124,7 +157,7 @@ export function Card({
     padding: '0.5rem',
     position: 'relative',
     transition: 'transform 0.3s ease',
-    transform: `rotate(${card.tapped ? 90 : 0}deg) rotate(${card.upsideDown ? 180 : 0}deg)`,
+    transform: `rotate(${card.tapped ? 90 : 0}deg)`,
     cursor: isInteractive ? 'pointer' : 'default',
     display: 'flex',
     flexDirection: 'column',
@@ -188,16 +221,43 @@ export function Card({
   const handleTapToggle = (e: React.MouseEvent) => {
     if (!isInteractive || !isInBattlefield) return
     e.stopPropagation()
+    
+    // Ctrl+click for selection
+    if (e.ctrlKey || e.metaKey) {
+      toggleCardSelection(cardId)
+      return
+    }
+    
+    // Normal click - clear selection and tap
+    clearSelection()
     setCardTapped(cardId, !card.tapped, playerId)
   }
 
   const handleMove = (targetZone: string, position?: 'top' | 'bottom', faceDown?: boolean) => {
     const targetZoneId = `${targetZone}-${playerId}`
-    moveCardToZone(cardId, targetZoneId, position || 'auto', playerId)
-
-    // Set face-down state if specified
-    if (faceDown !== undefined) {
-      setCardFaceDown(cardId, faceDown, playerId)
+    
+    // Use the captured selection state from when menu opened
+    const currentlySelected = menuSelectedCards.has(cardId)
+    
+    // If this card is selected and there are multiple selections, move all of them
+    if (currentlySelected && menuSelectedCards.size > 1) {
+      menuSelectedCards.forEach(selectedCardId => {
+        moveCardToZone(selectedCardId, targetZoneId, position || 'auto', playerId)
+        
+        // Set face-down state if specified
+        if (faceDown !== undefined) {
+          setCardFaceDown(selectedCardId, faceDown, playerId)
+        }
+      })
+      // Don't clear selection - keep cards selected for additional operations
+    } else {
+      // Move just this card
+      moveCardToZone(cardId, targetZoneId, position || 'auto', playerId)
+      
+      // Set face-down state if specified
+      if (faceDown !== undefined) {
+        setCardFaceDown(cardId, faceDown, playerId)
+      }
     }
 
     setShowMenu(false)
@@ -206,10 +266,24 @@ export function Card({
 
   const handleMoveToPlayer = (targetPlayerId: string) => {
     const targetZoneId = `battlefield-${targetPlayerId}`
-    moveCardToZone(cardId, targetZoneId, 'auto', playerId)
-
-    // Set card face-up when giving to another player
-    setCardFaceDown(cardId, false, playerId)
+    
+    // Use the captured selection state from when menu opened
+    const currentlySelected = menuSelectedCards.has(cardId)
+    
+    // If this card is selected and there are multiple selections, move all of them
+    if (currentlySelected && menuSelectedCards.size > 1) {
+      menuSelectedCards.forEach(selectedCardId => {
+        moveCardToZone(selectedCardId, targetZoneId, 'auto', playerId)
+        // Set card face-up when giving to another player
+        setCardFaceDown(selectedCardId, false, playerId)
+      })
+      // Don't clear selection - keep cards selected for additional operations
+    } else {
+      // Move just this card
+      moveCardToZone(cardId, targetZoneId, 'auto', playerId)
+      // Set card face-up when giving to another player
+      setCardFaceDown(cardId, false, playerId)
+    }
 
     setShowMenu(false)
     setShowMoveSubmenu(false)
@@ -237,6 +311,27 @@ export function Card({
     e.dataTransfer.setData('order', card.order.toString())
     e.dataTransfer.setData('dragOffsetX', offsetX.toString())
     e.dataTransfer.setData('dragOffsetY', offsetY.toString())
+
+    // If this card is part of a selection, include all selected cards
+    const selectedCards = getSelectedCardIds()
+    if (isSelected && selectedCards.size > 1) {
+      // Store all selected card IDs and their relative positions
+      const cardsMap = ydoc.getMap('cards')
+      const selectedCardData: { id: string; relativeX: number; relativeY: number }[] = []
+      
+      cardsMap.forEach((cardData, cardIdKey) => {
+        const typedCard = cardData as CardType
+        if (selectedCards.has(cardIdKey) && typedCard.position) {
+          selectedCardData.push({
+            id: cardIdKey,
+            relativeX: typedCard.position.x - card.position!.x,
+            relativeY: typedCard.position.y - card.position!.y,
+          })
+        }
+      })
+      
+      e.dataTransfer.setData('selectedCards', JSON.stringify(selectedCardData))
+    }
 
     // Set custom drag image with the same offset for better visual feedback
     try {
@@ -335,6 +430,8 @@ export function Card({
           overflow: 'hidden',
           opacity: isDragging ? 0.5 : 1,
           cursor: isInteractive ? 'grab' : 'default',
+          border: isSelected ? '4px solid #2196F3' : 'none',
+          boxShadow: isSelected ? '0 0 12px rgba(33, 150, 243, 0.8)' : 'none',
         }}
         title={!cardIsFaceDown || card.owner === playerId ? card.oracleId : undefined}
         draggable={isInteractive}
@@ -344,6 +441,16 @@ export function Card({
         onContextMenu={(e) => {
           if (!isInteractive) return
           e.preventDefault()
+          // Capture selection state when menu opens
+          const selectedCards = getSelectedCardIds()
+          const currentlySelected = isCardSelected(cardId)
+          setMenuSelectedCards(selectedCards)
+          console.log('Menu opened - captured selection:', {
+            cardId,
+            currentlySelected,
+            selectedCardsSize: selectedCards.size,
+            selectedCardIds: Array.from(selectedCards)
+          })
           setShowMenu(!showMenu)
         }}
         onMouseEnter={handleMouseEnter}
@@ -488,6 +595,18 @@ export function Card({
             ref={menuButtonRef}
             onClick={(e) => {
               e.stopPropagation()
+              
+              // Capture selection state when menu button is clicked
+              const selectedCards = getSelectedCardIds()
+              const currentlySelected = isCardSelected(cardId)
+              setMenuSelectedCards(selectedCards)
+              console.log('Menu button clicked - captured selection:', {
+                cardId,
+                currentlySelected,
+                selectedCardsSize: selectedCards.size,
+                selectedCardIds: Array.from(selectedCards)
+              })
+              
               if (!showMenu && menuButtonRef.current) {
                 const rect = menuButtonRef.current.getBoundingClientRect()
                 const viewportHeight = window.innerHeight
@@ -592,7 +711,19 @@ export function Card({
                 e.currentTarget.style.backgroundColor = 'white'
               }}
             >
-              <span>Move to...</span>
+              <span>
+                Move to...
+                {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
+                  <span style={{ 
+                    marginLeft: '6px', 
+                    color: '#2196F3',
+                    fontWeight: 'bold',
+                    fontSize: '0.9em'
+                  }}>
+                    ({menuSelectedCards.size} cards)
+                  </span>
+                )}
+              </span>
               <span>▶</span>
             </div>
 
@@ -640,7 +771,19 @@ export function Card({
                 e.currentTarget.style.backgroundColor = 'white'
               }}
             >
-              <span>Counters...</span>
+              <span>
+                Counters...
+                {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
+                  <span style={{ 
+                    marginLeft: '6px', 
+                    color: '#2196F3',
+                    fontWeight: 'bold',
+                    fontSize: '0.9em'
+                  }}>
+                    ({menuSelectedCards.size} cards)
+                  </span>
+                )}
+              </span>
               <span>▶</span>
             </div>
 
@@ -747,7 +890,14 @@ export function Card({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            modifyCounters(cardId, type, 1, playerId)
+                            const currentlySelected = menuSelectedCards.has(cardId)
+                            if (currentlySelected && menuSelectedCards.size > 1) {
+                              menuSelectedCards.forEach(selectedCardId => {
+                                modifyCounters(selectedCardId, type, 1, playerId)
+                              })
+                            } else {
+                              modifyCounters(cardId, type, 1, playerId)
+                            }
                           }}
                           style={{
                             padding: '2px 6px',
@@ -765,7 +915,14 @@ export function Card({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            modifyCounters(cardId, type, -1, playerId)
+                            const currentlySelected = menuSelectedCards.has(cardId)
+                            if (currentlySelected && menuSelectedCards.size > 1) {
+                              menuSelectedCards.forEach(selectedCardId => {
+                                modifyCounters(selectedCardId, type, -1, playerId)
+                              })
+                            } else {
+                              modifyCounters(cardId, type, -1, playerId)
+                            }
                           }}
                           style={{
                             padding: '2px 6px',
@@ -1076,7 +1233,19 @@ export function Card({
                       alignItems: 'center',
                     }}
                   >
-                    <span>→ Player</span>
+                    <span>
+                      → Player
+                      {menuSelectedCards.has(cardId) && menuSelectedCards.size > 1 && (
+                        <span style={{ 
+                          marginLeft: '6px', 
+                          color: '#2196F3',
+                          fontWeight: 'bold',
+                          fontSize: '0.9em'
+                        }}>
+                          ({menuSelectedCards.size} cards)
+                        </span>
+                      )}
+                    </span>
                     <span>▶</span>
                   </div>
                 </div>
@@ -1149,8 +1318,19 @@ export function Card({
           title={`Set ${counterModal.counterType} counters`}
           max={99}
           onConfirm={(value) => {
-            const current = card.counters[counterModal.counterType!] || 0
-            modifyCounters(cardId, counterModal.counterType!, value - current, playerId)
+            const currentlySelected = menuSelectedCards.has(cardId)
+            if (currentlySelected && menuSelectedCards.size > 1) {
+              menuSelectedCards.forEach(selectedCardId => {
+                const selectedCard = ydoc.getMap('cards').get(selectedCardId) as CardType
+                if (selectedCard) {
+                  const current = selectedCard.counters[counterModal.counterType!] || 0
+                  modifyCounters(selectedCardId, counterModal.counterType!, value - current, playerId)
+                }
+              })
+            } else {
+              const current = card.counters[counterModal.counterType!] || 0
+              modifyCounters(cardId, counterModal.counterType!, value - current, playerId)
+            }
             setCounterModal(null)
           }}
           onCancel={() => setCounterModal(null)}
@@ -1162,7 +1342,14 @@ export function Card({
           title="Add Counter Type"
           placeholder="e.g., +1/+1, Loyalty, Charge"
           onConfirm={(counterType) => {
-            modifyCounters(cardId, counterType, 1, playerId)
+            const currentlySelected = menuSelectedCards.has(cardId)
+            if (currentlySelected && menuSelectedCards.size > 1) {
+              menuSelectedCards.forEach(selectedCardId => {
+                modifyCounters(selectedCardId, counterType, 1, playerId)
+              })
+            } else {
+              modifyCounters(cardId, counterType, 1, playerId)
+            }
             setCounterModal(null)
           }}
           onCancel={() => setCounterModal(null)}
