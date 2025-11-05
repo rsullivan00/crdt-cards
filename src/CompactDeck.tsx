@@ -57,7 +57,9 @@ export function CompactDeck({
   const [showRevealPreview, setShowRevealPreview] = useState(false)
   const [revealPreviewPosition, setRevealPreviewPosition] = useState<{ top: number; left: number } | null>(null)
 
-  const { imageUrl: revealedImageUrl } = useCardImage(revealedCard?.cardName || '')
+  // Check if the revealed card belongs to THIS deck
+  const shouldShowReveal = revealedCard && revealedCard.revealedBy === playerId
+  const { imageUrl: revealedImageUrl } = useCardImage(shouldShowReveal ? revealedCard.cardName : '')
 
   const handleDoubleClick = () => {
     if (cardCount > 0) {
@@ -105,8 +107,8 @@ export function CompactDeck({
         style={{
           width: '120px',
           height: '160px',
-          backgroundColor: revealedCard && revealedImageUrl ? 'transparent' : '#333',
-          backgroundImage: revealedCard && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
+          backgroundColor: shouldShowReveal && revealedImageUrl ? 'transparent' : '#333',
+          backgroundImage: shouldShowReveal && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           border: '2px solid #666',
@@ -120,8 +122,8 @@ export function CompactDeck({
           userSelect: 'none',
         }}
         onMouseEnter={(e) => {
-          // Only show hover preview if there's a revealed card
-          if (!revealedCard) return
+          // Only show hover preview if there's a revealed card for THIS deck
+          if (!shouldShowReveal) return
 
           const rect = e.currentTarget.getBoundingClientRect()
           const viewportWidth = window.innerWidth
@@ -153,19 +155,6 @@ export function CompactDeck({
           setRevealPreviewPosition(null)
         }}
       >
-        {/* Show card count only when no card is revealed */}
-        {!revealedCard && (
-          <div
-            style={{
-              fontSize: '0.75rem',
-              color: '#999',
-              marginTop: '0.5rem',
-            }}
-          >
-            {cardCount} cards
-          </div>
-        )}
-
         {/* Menu Button */}
         <button
           onClick={(e) => {

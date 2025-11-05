@@ -521,26 +521,76 @@ function App() {
               />
             </div>
 
-            {/* Control Panel - Only show for current player */}
-            {currentPlayer && displayedPlayerId === currentPlayerId && (
+            {/* Control Panel - Show for all players, but with different functionality */}
+            {playersMap.get(displayedPlayerId) && (
               <>
-                {/* Deck */}
-                <CompactDeck
-                  cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
-                  playerColor={getPlayerColor(displayedPlayerId)}
-                  playerId={displayedPlayerId}
-                  revealedCard={revealedCard}
-                  onDrawOne={() => drawCards(displayedPlayerId, 1)}
-                  onDrawN={(count) => drawCards(displayedPlayerId, count)}
-                  onMillOne={() => millCards(displayedPlayerId, 1)}
-                  onMillN={(count) => millCards(displayedPlayerId, count)}
-                  onExileOne={(faceDown) => exileFromDeck(displayedPlayerId, 1, faceDown)}
-                  onExileN={(count, faceDown) => exileFromDeck(displayedPlayerId, count, faceDown)}
-                  onRevealTop={() => {
-                    revealTopCard(displayedPlayerId)
-                  }}
-                  onShuffle={() => shuffleDeck(displayedPlayerId)}
-                />
+                {/* Deck - Interactive for current player, display-only for opponents */}
+                {displayedPlayerId === currentPlayerId ? (
+                  <CompactDeck
+                    cardCount={getZoneCards(`deck-${displayedPlayerId}`).length}
+                    playerColor={getPlayerColor(displayedPlayerId)}
+                    playerId={displayedPlayerId}
+                    revealedCard={revealedCard}
+                    onDrawOne={() => drawCards(displayedPlayerId, 1)}
+                    onDrawN={(count) => drawCards(displayedPlayerId, count)}
+                    onMillOne={() => millCards(displayedPlayerId, 1)}
+                    onMillN={(count) => millCards(displayedPlayerId, count)}
+                    onExileOne={(faceDown) => exileFromDeck(displayedPlayerId, 1, faceDown)}
+                    onExileN={(count, faceDown) => exileFromDeck(displayedPlayerId, count, faceDown)}
+                    onRevealTop={() => {
+                      revealTopCard(displayedPlayerId)
+                    }}
+                    onShuffle={() => shuffleDeck(displayedPlayerId)}
+                  />
+                ) : (
+                  // Simplified deck display for opponents (no menu) - but shows revealed cards
+                  (() => {
+                    const shouldShowReveal = revealedCard && revealedCard.revealedBy === displayedPlayerId
+                    const revealedImageUrl = shouldShowReveal ?
+                      // We need to import useCardImage hook result here, but we can't use hooks conditionally
+                      // So we'll use a simpler approach with direct Scryfall URL
+                      `https://api.scryfall.com/cards/named?format=image&exact=${encodeURIComponent(revealedCard?.cardName || '')}`
+                      : ''
+
+                    return (
+                      <div
+                        style={{
+                          width: '120px',
+                          height: '160px',
+                          backgroundColor: shouldShowReveal && revealedImageUrl ? 'transparent' : '#333',
+                          backgroundImage: shouldShowReveal && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          border: '2px solid #666',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: getPlayerColor(displayedPlayerId),
+                            color: 'white',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          📚 {getZoneCards(`deck-${displayedPlayerId}`).length}
+                        </div>
+                      </div>
+                    )
+                  })()
+                )}
 
                 {/* Life Counter + Buttons Column */}
                 <div
@@ -553,12 +603,12 @@ function App() {
                   {/* Life Counter */}
                   <CompactLifeCounter
                     playerId={displayedPlayerId}
-                    lifeTotal={currentPlayer.lifeTotal}
+                    lifeTotal={playersMap.get(displayedPlayerId)!.lifeTotal}
                     playerColor={getPlayerColor(displayedPlayerId)}
                     currentPlayerId={currentPlayerId}
                   />
 
-                  {/* Quick Action Buttons Grid */}
+                  {/* Quick Action Buttons Grid - Show for all players */}
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {/* Graveyard Button */}
                     <button

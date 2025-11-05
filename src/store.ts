@@ -750,9 +750,10 @@ export function revealTopCard(playerId: string): { cardName: string; playerName:
   const playerName = player?.name || playerId
 
   // Store the revealed card in the CRDT so all players see it
+  // Store playerId (not playerName) so DeckOverlay can properly identify which deck has the reveal
   revealedCardMap.set('current', {
     cardName: topCard.oracleId,
-    revealedBy: playerName,
+    revealedBy: playerId,
     timestamp: Date.now(),
   })
 
