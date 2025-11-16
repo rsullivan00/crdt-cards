@@ -52,6 +52,29 @@ export interface StoredDeck {
   cards: Array<{ name: string; quantity: number }>
 }
 
+export interface PlayerCounter {
+  type: string           // 'poison', 'commanderDamage', or custom name
+  value: number
+  sourcePlayerId?: string  // Only for commander damage (which opponent)
+}
+
+// Predefined counter types with special rules
+export const BUILTIN_PLAYER_COUNTERS = {
+  poison: {
+    name: 'Poison',
+    emoji: '☠️',
+    color: '#9C27B0',
+    loseAt: 10
+  },
+  commanderDamage: {
+    name: 'Commander Damage',
+    emoji: '⚔️',
+    color: '#F44336',
+    loseAt: 21,
+    isPerOpponent: true
+  }
+} as const
+
 // ============================================================================
 // YJS DOCUMENT SETUP
 // ============================================================================
@@ -69,6 +92,7 @@ export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle s
 export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
 export const counterTypesMap = ydoc.getMap<boolean>('counterTypes') // Track counter types used in this room
 export const revealedCardMap = ydoc.getMap<{ cardName: string; revealedBy: string; timestamp: number }>('revealedCard') // Currently revealed card
+export const playerCountersMap = ydoc.getMap<PlayerCounter>('playerCounters') // Player-level counters (poison, commander damage, custom)
 
 // ============================================================================
 // LOCAL SELECTION STATE (not synced via CRDT)
@@ -282,6 +306,15 @@ export function removePlayer(playerId: string): void {
   })
   cardsToRemove.forEach(cardId => cardsMap.delete(cardId))
 
+  // Remove player's counters
+  const counterKeysToRemove: string[] = []
+  playerCountersMap.forEach((_, key) => {
+    if (key.startsWith(`${playerId}-`) || key.includes(`-${playerId}`)) {
+      counterKeysToRemove.push(key)
+    }
+  })
+  counterKeysToRemove.forEach(key => playerCountersMap.delete(key))
+
   // Remove player
   playersMap.delete(playerId)
 
@@ -311,6 +344,7 @@ export function resetRoom(): void {
   cardsMap.clear()
   batonMap.clear()
   seedMap.clear()
+  playerCountersMap.clear()
   logArray.delete(0, logArray.length)
 
   console.log('Room reset - all state cleared')
@@ -1063,6 +1097,184 @@ export function deleteCard(cardId: string, playerId?: string): void {
   if (playerId) {
     logEvent(playerId, 'card_deleted', { cardId, oracleId: card.oracleId })
   }
+}
+
+// ============================================================================
+// PLAYER COUNTERS (poison, commander damage, custom)
+// ============================================================================
+
+/**
+ * Get all counters for a player
+ */
+export function getPlayerCounters(playerId: string): Array<{
+  type: string
+  value: number
+  sourcePlayerId?: string
+  isBuiltin: boolean
+}> {
+  const counters: Array<{
+    type: string
+    value: number
+    sourcePlayerId?: string
+    isBuiltin: boolean
+  }> = []
+
+  playerCountersMap.forEach((counter, key) => {
+    // Key format: ${playerId}-${type} or ${playerId}-${type}-${sourcePlayerId}
+    if (key.startsWith(`${playerId}-`)) {
+      const isBuiltin = counter.type === 'poison' || counter.type === 'commanderDamage'
+      counters.push({
+        type: counter.type,
+        value: counter.value,
+        sourcePlayerId: counter.sourcePlayerId,
+        isBuiltin
+      })
+    }
+  })
+
+  return counters
+}
+
+/**
+ * Modify a player counter (builtin or custom)
+ */
+export function modifyPlayerCounter(
+  playerId: string,
+  counterType: string,
+  delta: number,
+  sourcePlayerId?: string,
+  actionPlayerId?: string
+): void {
+  // Build the key
+  const key = sourcePlayerId
+    ? `${playerId}-${counterType}-${sourcePlayerId}`
+    : `${playerId}-${counterType}`
+
+  const existing = playerCountersMap.get(key)
+  const currentValue = existing?.value ?? 0
+  const newValue = Math.max(0, currentValue + delta)
+
+  if (newValue === 0) {
+    // Remove counter if it reaches 0
+    playerCountersMap.delete(key)
+  } else {
+    // Update counter
+    playerCountersMap.set(key, {
+      type: counterType,
+      value: newValue,
+      sourcePlayerId
+    })
+  }
+
+  // Track counter type usage (for autocomplete suggestions)
+  counterTypesMap.set(`player:${counterType}`, true)
+
+  // Log the change
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'player_counter_modified', {
+      playerId,
+      counterType,
+      delta,
+      newValue,
+      sourcePlayerId
+    })
+  }
+}
+
+/**
+ * Delete a player counter completely
+ */
+export function deletePlayerCounter(
+  playerId: string,
+  counterType: string,
+  sourcePlayerId?: string,
+  actionPlayerId?: string
+): void {
+  const key = sourcePlayerId
+    ? `${playerId}-${counterType}-${sourcePlayerId}`
+    : `${playerId}-${counterType}`
+
+  playerCountersMap.delete(key)
+
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'player_counter_deleted', {
+      playerId,
+      counterType,
+      sourcePlayerId
+    })
+  }
+}
+
+/**
+ * Get the value of a specific player counter
+ */
+export function getPlayerCounterValue(
+  playerId: string,
+  counterType: string,
+  sourcePlayerId?: string
+): number {
+  const key = sourcePlayerId
+    ? `${playerId}-${counterType}-${sourcePlayerId}`
+    : `${playerId}-${counterType}`
+
+  const counter = playerCountersMap.get(key)
+  return counter?.value ?? 0
+}
+
+/**
+ * Check if a player has lost due to counter thresholds
+ */
+export function checkPlayerLoss(playerId: string): {
+  hasLost: boolean
+  reason?: string
+} {
+  // Check poison counters
+  const poisonCount = getPlayerCounterValue(playerId, 'poison')
+  if (poisonCount >= BUILTIN_PLAYER_COUNTERS.poison.loseAt) {
+    return {
+      hasLost: true,
+      reason: 'Poison counters'
+    }
+  }
+
+  // Check commander damage from any opponent
+  const allCounters = getPlayerCounters(playerId)
+  const commanderDamageCounters = allCounters.filter(c => c.type === 'commanderDamage')
+
+  for (const counter of commanderDamageCounters) {
+    if (counter.value >= BUILTIN_PLAYER_COUNTERS.commanderDamage.loseAt) {
+      const sourcePlayer = counter.sourcePlayerId
+        ? playersMap.get(counter.sourcePlayerId)
+        : null
+      const sourceName = sourcePlayer?.name || 'opponent'
+
+      return {
+        hasLost: true,
+        reason: `Commander damage from ${sourceName}`
+      }
+    }
+  }
+
+  return { hasLost: false }
+}
+
+/**
+ * Get recently used custom counter types in this room
+ */
+export function getRecentPlayerCounterTypes(): string[] {
+  const types = new Set<string>()
+
+  counterTypesMap.forEach((_, key) => {
+    if (key.startsWith('player:')) {
+      const type = key.substring(7) // Remove 'player:' prefix
+      // Skip builtin types
+      if (type !== 'poison' && type !== 'commanderDamage') {
+        types.add(type)
+      }
+    }
+  })
+
+  return Array.from(types)
 }
 
 // ============================================================================

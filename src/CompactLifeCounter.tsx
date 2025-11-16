@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { modifyLifeTotal, setLifeTotal } from './store'
+import { PlayerCountersDisplay } from './PlayerCountersDisplay'
+import { PlayerCountersModal } from './PlayerCountersModal'
 
 interface CompactLifeCounterProps {
   playerId: string
@@ -15,6 +17,7 @@ export function CompactLifeCounter({
   currentPlayerId,
 }: CompactLifeCounterProps) {
   const [showSettings, setShowSettings] = useState(false)
+  const [showCountersModal, setShowCountersModal] = useState(false)
 
   const handleIncrement = () => {
     modifyLifeTotal(playerId, 1, currentPlayerId)
@@ -29,31 +32,41 @@ export function CompactLifeCounter({
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          backgroundColor: '#fff',
-          border: `2px solid ${playerColor}`,
-          borderRadius: '8px',
-          padding: '0.5rem',
+          flexDirection: 'column',
+          gap: '0.25rem',
         }}
       >
-        {/* Life Total Display */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.25rem',
-            fontSize: '1.25rem',
-            fontWeight: 'bold',
-            color: lifeTotal <= 0 ? '#F44336' : '#333',
+            gap: '0.5rem',
+            backgroundColor: '#fff',
+            border: `2px solid ${playerColor}`,
+            borderRadius: '8px',
+            padding: '0.5rem',
           }}
         >
-          <span>❤️</span>
-          <span>{lifeTotal}</span>
-        </div>
+          {/* Life Total Display - Clickable to open counters modal */}
+          <div
+            onClick={() => setShowCountersModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              color: lifeTotal <= 0 ? '#F44336' : '#333',
+              cursor: 'pointer',
+            }}
+            title="Click to manage player counters"
+          >
+            <span>❤️</span>
+            <span>{lifeTotal}</span>
+          </div>
 
-        {/* Plus Button */}
-        <button
+          {/* Plus Button */}
+          <button
           onClick={handleIncrement}
           style={{
             width: '32px',
@@ -80,8 +93,8 @@ export function CompactLifeCounter({
           +
         </button>
 
-        {/* Minus Button */}
-        <button
+          {/* Minus Button */}
+          <button
           onClick={handleDecrement}
           style={{
             width: '32px',
@@ -108,8 +121,8 @@ export function CompactLifeCounter({
           −
         </button>
 
-        {/* Settings Button */}
-        <button
+          {/* Settings Button */}
+          <button
           onClick={() => setShowSettings(!showSettings)}
           style={{
             width: '32px',
@@ -130,10 +143,25 @@ export function CompactLifeCounter({
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = '#757575'
           }}
-        >
-          ⚙️
-        </button>
+          >
+            ⚙️
+          </button>
+        </div>
+
+        {/* Player Counters Display (only shows if counters exist) */}
+        <PlayerCountersDisplay
+          playerId={playerId}
+          onClick={() => setShowCountersModal(true)}
+        />
       </div>
+
+      {/* Player Counters Modal */}
+      <PlayerCountersModal
+        isOpen={showCountersModal}
+        onClose={() => setShowCountersModal(false)}
+        playerId={playerId}
+        currentPlayerId={currentPlayerId}
+      />
 
       {/* Settings Menu */}
       {showSettings && (

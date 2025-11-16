@@ -5,6 +5,7 @@ import {
   cardsMap,
   batonMap,
   revealedCardMap,
+  playerCountersMap,
   addPlayer,
   resetRoom,
   removePlayer,
@@ -124,6 +125,7 @@ function App() {
     zonesMap.observe(updateUI)
     cardsMap.observe(updateUI)
     batonMap.observe(updateUI)
+    playerCountersMap.observe(updateUI)
 
     // Subscribe to revealed card changes
     const updateRevealedCard = () => {
@@ -187,6 +189,7 @@ function App() {
       zonesMap.unobserve(updateUI)
       cardsMap.unobserve(updateUI)
       batonMap.unobserve(updateUI)
+      playerCountersMap.unobserve(updateUI)
       revealedCardMap.unobserve(updateRevealedCard)
       provider.off('status', handleStatus)
       provider.off('synced', handleSynced)
