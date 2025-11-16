@@ -487,13 +487,12 @@ function App() {
           style={{
             flex: 1,
             overflow: 'hidden',
-            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
           {/* Battlefield - Takes remaining space */}
-          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          <div style={{ flex: 1, overflow: 'auto', minHeight: 0, position: 'relative' }}>
             <Zone
               zoneId={`battlefield-${displayedPlayerId}`}
               zoneName="Battlefield"
@@ -503,6 +502,13 @@ function App() {
               playerId={displayedPlayerId}
               isInteractive={displayedPlayerId === currentPlayerId}
               viewerPlayerId={currentPlayerId}
+            />
+
+            {/* Chat Overlay - Positioned over battlefield */}
+            <ChatOverlay
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              currentPlayerId={currentPlayerId}
             />
           </div>
 
@@ -762,13 +768,6 @@ function App() {
         playerId={displayedPlayerId}
         viewerPlayerId={currentPlayerId}
         revealedCard={revealedCard}
-      />
-
-      {/* Chat Overlay */}
-      <ChatOverlay
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        currentPlayerId={currentPlayerId}
       />
 
       {/* Token Creation Modal */}

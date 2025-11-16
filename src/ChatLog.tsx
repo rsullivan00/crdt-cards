@@ -138,14 +138,18 @@ export function ChatLog({ currentPlayerId }: ChatLogProps) {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(4px)',
+        borderLeft: '2px solid rgba(0, 0, 0, 0.2)',
+        boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.15)',
       }}
     >
       {/* Header with filter tabs */}
       <div
         style={{
-          borderBottom: '2px solid #e0e0e0',
+          borderBottom: '2px solid rgba(224, 224, 224, 0.8)',
           padding: '0.75rem',
+          backgroundColor: 'rgba(249, 249, 249, 0.9)',
         }}
       >
         <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: '#666' }}>
@@ -185,6 +189,7 @@ export function ChatLog({ currentPlayerId }: ChatLogProps) {
           display: 'flex',
           flexDirection: 'column',
           gap: '0.5rem',
+          backgroundColor: 'transparent',
         }}
       >
         {filteredEvents.length === 0 ? (
@@ -251,10 +256,11 @@ export function ChatLog({ currentPlayerId }: ChatLogProps) {
       <form
         onSubmit={handleSendMessage}
         style={{
-          borderTop: '2px solid #e0e0e0',
+          borderTop: '2px solid rgba(224, 224, 224, 0.8)',
           padding: '0.75rem',
           display: 'flex',
           gap: '0.5rem',
+          backgroundColor: 'rgba(249, 249, 249, 0.9)',
         }}
       >
         <input
