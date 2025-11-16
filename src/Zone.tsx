@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Card as CardComponent } from './Card'
-import { Card as CardType, moveCardToZone, setCardPosition, selectCards, clearSelection } from './store'
+import { Card as CardType, moveCardToZoneUndoable, setCardPosition, selectCards, clearSelection } from './store'
 import { NumberInputModal } from './NumberInputModal'
 
 interface ZoneProps {
@@ -190,7 +190,7 @@ export function Zone({
               // If dropping from a different zone, move card first
               const cardFromZone = e.dataTransfer.getData('fromZoneId')
               if (cardFromZone !== zoneId) {
-                moveCardToZone(id, zoneId, 'auto', playerId)
+                moveCardToZoneUndoable(id, zoneId, 'auto', playerId)
               }
 
               // Set position with relative offset
@@ -207,7 +207,7 @@ export function Zone({
               // If dropping from a different zone, move card first
               const cardFromZone = e.dataTransfer.getData('fromZoneId')
               if (cardFromZone !== zoneId) {
-                moveCardToZone(id, zoneId, 'auto', playerId)
+                moveCardToZoneUndoable(id, zoneId, 'auto', playerId)
               }
 
               // Calculate grid position
@@ -231,7 +231,7 @@ export function Zone({
       // Single card handling (no selection)
       // If dropping from a different zone, move card first then set position
       if (fromZoneId !== zoneId) {
-        moveCardToZone(cardId, zoneId, 'auto', playerId)
+        moveCardToZoneUndoable(cardId, zoneId, 'auto', playerId)
       }
 
       // Set the position (this will also update if already in battlefield)
@@ -249,7 +249,7 @@ export function Zone({
         if (fromZoneId !== zoneId) {
           // Move all selected cards to this zone
           selectedCards.forEach(({ id }) => {
-            moveCardToZone(id, zoneId, 'auto', playerId)
+            moveCardToZoneUndoable(id, zoneId, 'auto', playerId)
           })
         }
 
@@ -267,7 +267,7 @@ export function Zone({
     }
 
     // Move card to this zone
-    moveCardToZone(cardId, zoneId, 'auto', playerId)
+    moveCardToZoneUndoable(cardId, zoneId, 'auto', playerId)
   }
 
   // Drag-to-select handlers for battlefield

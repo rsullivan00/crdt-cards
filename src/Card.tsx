@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Card as CardType, moveCardToZone, setCardTapped, setCardFaceDown, modifyCounters, counterTypesMap, deleteCard, playersMap, getPlayerColor, isCardSelected, toggleCardSelection, clearSelection, observeSelection, unobserveSelection, getSelectedCardIds, ydoc } from './store'
+import { Card as CardType, moveCardToZoneUndoable, setCardTappedUndoable, setCardFaceDown, modifyCountersUndoable, counterTypesMap, deleteCardUndoable, playersMap, getPlayerColor, isCardSelected, toggleCardSelection, clearSelection, observeSelection, unobserveSelection, getSelectedCardIds, ydoc } from './store'
 import { NumberInputModal } from './NumberInputModal'
 import { TextInputModal } from './TextInputModal'
 import { useCardImage } from './hooks/useCardImage'
@@ -142,11 +142,11 @@ export function Card({
     if (currentlySelected && menuSelectedCards.size > 1) {
       console.log('Applying to multiple cards:', Array.from(menuSelectedCards))
       menuSelectedCards.forEach(selectedCardId => {
-        modifyCounters(selectedCardId, counterType, 1, playerId)
+        modifyCountersUndoable(selectedCardId, counterType, 1, playerId)
       })
     } else {
       console.log('Applying to single card:', cardId)
-      modifyCounters(cardId, counterType, 1, playerId)
+      modifyCountersUndoable(cardId, counterType, 1, playerId)
     }
   }
 
@@ -246,13 +246,13 @@ export function Card({
       // Tap/untap all selected cards together
       const newTappedState = !card.tapped
       selectedCards.forEach(selectedCardId => {
-        setCardTapped(selectedCardId, newTappedState, playerId)
+        setCardTappedUndoable(selectedCardId, newTappedState, playerId)
       })
       // Keep selection active for additional operations
     } else {
       // Normal click - clear selection and tap just this card
       clearSelection()
-      setCardTapped(cardId, !card.tapped, playerId)
+      setCardTappedUndoable(cardId, !card.tapped, playerId)
     }
   }
 
@@ -265,7 +265,7 @@ export function Card({
     // If this card is selected and there are multiple selections, move all of them
     if (currentlySelected && menuSelectedCards.size > 1) {
       menuSelectedCards.forEach(selectedCardId => {
-        moveCardToZone(selectedCardId, targetZoneId, position || 'auto', playerId)
+        moveCardToZoneUndoable(selectedCardId, targetZoneId, position || 'auto', playerId)
 
         // Set face-down state if specified
         if (faceDown !== undefined) {
@@ -275,7 +275,7 @@ export function Card({
       // Don't clear selection - keep cards selected for additional operations
     } else {
       // Move just this card
-      moveCardToZone(cardId, targetZoneId, position || 'auto', playerId)
+      moveCardToZoneUndoable(cardId, targetZoneId, position || 'auto', playerId)
 
       // Set face-down state if specified
       if (faceDown !== undefined) {
@@ -296,14 +296,14 @@ export function Card({
     // If this card is selected and there are multiple selections, move all of them
     if (currentlySelected && menuSelectedCards.size > 1) {
       menuSelectedCards.forEach(selectedCardId => {
-        moveCardToZone(selectedCardId, targetZoneId, 'auto', playerId)
+        moveCardToZoneUndoable(selectedCardId, targetZoneId, 'auto', playerId)
         // Set card face-up when giving to another player
         setCardFaceDown(selectedCardId, false, playerId)
       })
       // Don't clear selection - keep cards selected for additional operations
     } else {
       // Move just this card
-      moveCardToZone(cardId, targetZoneId, 'auto', playerId)
+      moveCardToZoneUndoable(cardId, targetZoneId, 'auto', playerId)
       // Set card face-up when giving to another player
       setCardFaceDown(cardId, false, playerId)
     }
@@ -880,7 +880,7 @@ export function Card({
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  deleteCard(cardId, playerId)
+                  deleteCardUndoable(cardId, playerId)
                   setShowMenu(false)
                 }}
                 onMouseEnter={(e) => {
@@ -954,10 +954,10 @@ export function Card({
                             const currentlySelected = menuSelectedCards.has(cardId)
                             if (currentlySelected && menuSelectedCards.size > 1) {
                               menuSelectedCards.forEach(selectedCardId => {
-                                modifyCounters(selectedCardId, type, 1, playerId)
+                                modifyCountersUndoable(selectedCardId, type, 1, playerId)
                               })
                             } else {
-                              modifyCounters(cardId, type, 1, playerId)
+                              modifyCountersUndoable(cardId, type, 1, playerId)
                             }
                           }}
                           style={{
@@ -979,10 +979,10 @@ export function Card({
                             const currentlySelected = menuSelectedCards.has(cardId)
                             if (currentlySelected && menuSelectedCards.size > 1) {
                               menuSelectedCards.forEach(selectedCardId => {
-                                modifyCounters(selectedCardId, type, -1, playerId)
+                                modifyCountersUndoable(selectedCardId, type, -1, playerId)
                               })
                             } else {
-                              modifyCounters(cardId, type, -1, playerId)
+                              modifyCountersUndoable(cardId, type, -1, playerId)
                             }
                           }}
                           style={{
@@ -1385,12 +1385,12 @@ export function Card({
                 const selectedCard = ydoc.getMap('cards').get(selectedCardId) as CardType
                 if (selectedCard) {
                   const current = selectedCard.counters[counterModal.counterType!] || 0
-                  modifyCounters(selectedCardId, counterModal.counterType!, value - current, playerId)
+                  modifyCountersUndoable(selectedCardId, counterModal.counterType!, value - current, playerId)
                 }
               })
             } else {
               const current = card.counters[counterModal.counterType!] || 0
-              modifyCounters(cardId, counterModal.counterType!, value - current, playerId)
+              modifyCountersUndoable(cardId, counterModal.counterType!, value - current, playerId)
             }
             setCounterModal(null)
           }}
@@ -1406,10 +1406,10 @@ export function Card({
             const currentlySelected = menuSelectedCards.has(cardId)
             if (currentlySelected && menuSelectedCards.size > 1) {
               menuSelectedCards.forEach(selectedCardId => {
-                modifyCounters(selectedCardId, counterType, 1, playerId)
+                modifyCountersUndoable(selectedCardId, counterType, 1, playerId)
               })
             } else {
-              modifyCounters(cardId, counterType, 1, playerId)
+              modifyCountersUndoable(cardId, counterType, 1, playerId)
             }
             setCounterModal(null)
           }}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createToken } from './store'
+import { createTokenUndoable } from './store'
 
 interface TokenCreationModalProps {
   playerId: string
@@ -131,7 +131,7 @@ export function TokenCreationModal({ playerId, onClose }: TokenCreationModalProp
     const quantity = quantities[tokenName] || 1
     const token = COMMON_TOKENS.find(t => t.name === tokenName)
     const imageUrl = token?.imageUrl
-    createToken(playerId, tokenName, quantity, imageUrl)
+    createTokenUndoable(playerId, tokenName, quantity, imageUrl)
     onClose()
   }
 
@@ -183,13 +183,13 @@ export function TokenCreationModal({ playerId, onClose }: TokenCreationModalProp
       saveRecentToken(card.name, imageUrl)
     }
 
-    createToken(playerId, card.name, 1, imageUrl)
+    createTokenUndoable(playerId, card.name, 1, imageUrl)
     onClose()
   }
 
   const handleCreateRecentToken = (token: RecentToken) => {
     const quantity = quantities[token.name] || 1
-    createToken(playerId, token.name, quantity, token.imageUrl)
+    createTokenUndoable(playerId, token.name, quantity, token.imageUrl)
     onClose()
   }
 

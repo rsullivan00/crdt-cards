@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { modifyLifeTotal, setLifeTotal } from './store'
+import { modifyLifeTotalUndoable, setLifeTotalUndoable } from './store'
 import { PlayerCountersDisplay } from './PlayerCountersDisplay'
 import { PlayerCountersModal } from './PlayerCountersModal'
 
@@ -20,11 +20,11 @@ export function CompactLifeCounter({
   const [showCountersModal, setShowCountersModal] = useState(false)
 
   const handleIncrement = () => {
-    modifyLifeTotal(playerId, 1, currentPlayerId)
+    modifyLifeTotalUndoable(playerId, 1, currentPlayerId)
   }
 
   const handleDecrement = () => {
-    modifyLifeTotal(playerId, -1, currentPlayerId)
+    modifyLifeTotalUndoable(playerId, -1, currentPlayerId)
   }
 
   return (
@@ -216,7 +216,7 @@ export function CompactLifeCounter({
             >
               <button
                 onClick={() => {
-                  modifyLifeTotal(playerId, 5, currentPlayerId)
+                  modifyLifeTotalUndoable(playerId, 5, currentPlayerId)
                   setShowSettings(false)
                 }}
                 style={{
@@ -234,7 +234,7 @@ export function CompactLifeCounter({
               </button>
               <button
                 onClick={() => {
-                  modifyLifeTotal(playerId, -5, currentPlayerId)
+                  modifyLifeTotalUndoable(playerId, -5, currentPlayerId)
                   setShowSettings(false)
                 }}
                 style={{
@@ -252,7 +252,7 @@ export function CompactLifeCounter({
               </button>
               <button
                 onClick={() => {
-                  modifyLifeTotal(playerId, 10, currentPlayerId)
+                  modifyLifeTotalUndoable(playerId, 10, currentPlayerId)
                   setShowSettings(false)
                 }}
                 style={{
@@ -270,7 +270,7 @@ export function CompactLifeCounter({
               </button>
               <button
                 onClick={() => {
-                  modifyLifeTotal(playerId, -10, currentPlayerId)
+                  modifyLifeTotalUndoable(playerId, -10, currentPlayerId)
                   setShowSettings(false)
                 }}
                 style={{
@@ -301,7 +301,7 @@ export function CompactLifeCounter({
                 if (value !== null) {
                   const newTotal = parseInt(value, 10)
                   if (!isNaN(newTotal)) {
-                    setLifeTotal(playerId, newTotal, currentPlayerId)
+                    setLifeTotalUndoable(playerId, newTotal, currentPlayerId)
                   }
                 }
                 setShowSettings(false)

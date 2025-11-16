@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import { WebrtcProvider } from 'y-webrtc'
+import { pushUndoAction } from './undo'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -52,29 +53,6 @@ export interface StoredDeck {
   cards: Array<{ name: string; quantity: number }>
 }
 
-export interface PlayerCounter {
-  type: string           // 'poison', 'commanderDamage', or custom name
-  value: number
-  sourcePlayerId?: string  // Only for commander damage (which opponent)
-}
-
-// Predefined counter types with special rules
-export const BUILTIN_PLAYER_COUNTERS = {
-  poison: {
-    name: 'Poison',
-    emoji: '☠️',
-    color: '#9C27B0',
-    loseAt: 10
-  },
-  commanderDamage: {
-    name: 'Commander Damage',
-    emoji: '⚔️',
-    color: '#F44336',
-    loseAt: 21,
-    isPerOpponent: true
-  }
-} as const
-
 // ============================================================================
 // YJS DOCUMENT SETUP
 // ============================================================================
@@ -92,7 +70,6 @@ export const seedMap = ydoc.getMap<string>('seed') // Single entry for shuffle s
 export const logArray = ydoc.getArray<GameEvent>('log') // Event log for undo/audit
 export const counterTypesMap = ydoc.getMap<boolean>('counterTypes') // Track counter types used in this room
 export const revealedCardMap = ydoc.getMap<{ cardName: string; revealedBy: string; timestamp: number }>('revealedCard') // Currently revealed card
-export const playerCountersMap = ydoc.getMap<PlayerCounter>('playerCounters') // Player-level counters (poison, commander damage, custom)
 
 // ============================================================================
 // LOCAL SELECTION STATE (not synced via CRDT)
@@ -306,15 +283,6 @@ export function removePlayer(playerId: string): void {
   })
   cardsToRemove.forEach(cardId => cardsMap.delete(cardId))
 
-  // Remove player's counters
-  const counterKeysToRemove: string[] = []
-  playerCountersMap.forEach((_, key) => {
-    if (key.startsWith(`${playerId}-`) || key.includes(`-${playerId}`)) {
-      counterKeysToRemove.push(key)
-    }
-  })
-  counterKeysToRemove.forEach(key => playerCountersMap.delete(key))
-
   // Remove player
   playersMap.delete(playerId)
 
@@ -344,7 +312,6 @@ export function resetRoom(): void {
   cardsMap.clear()
   batonMap.clear()
   seedMap.clear()
-  playerCountersMap.clear()
   logArray.delete(0, logArray.length)
 
   console.log('Room reset - all state cleared')
@@ -532,6 +499,164 @@ export function modifyCounters(
       newValue,
     })
   }
+}
+
+/**
+ * Built-in player counter types (poison, commander damage)
+ */
+export const BUILTIN_PLAYER_COUNTERS = {
+  poison: {
+    name: 'Poison',
+    emoji: '☠️',
+    color: '#9C27B0',
+  },
+  commanderDamage: {
+    name: 'Commander Damage',
+    emoji: '⚔️',
+    color: '#F44336',
+  },
+}
+
+/**
+ * Player counter storage in YJS
+ * Format: Map<playerId, Map<counterKey, value>>
+ * counterKey format:
+ * - "poison" for poison counters
+ * - "commanderDamage:sourcePlayerId" for commander damage from specific player
+ * - any other string for custom counters
+ */
+export const playerCountersMap = ydoc.getMap<{ [counterKey: string]: number }>('playerCounters')
+
+/**
+ * Get all counters for a player
+ */
+export function getPlayerCounters(playerId: string): { [counterKey: string]: number } {
+  return playerCountersMap.get(playerId) || {}
+}
+
+/**
+ * Counter object format for UI components
+ */
+export interface PlayerCounterDisplay {
+  type: string
+  value: number
+  sourcePlayerId?: string
+  isBuiltin: boolean
+}
+
+/**
+ * Get player counters as an array for UI display
+ */
+export function getPlayerCountersArray(playerId: string): PlayerCounterDisplay[] {
+  const counters = getPlayerCounters(playerId)
+  const result: PlayerCounterDisplay[] = []
+
+  for (const [key, value] of Object.entries(counters)) {
+    if (key === 'poison') {
+      result.push({
+        type: 'poison',
+        value,
+        isBuiltin: true,
+      })
+    } else if (key.startsWith('commanderDamage:')) {
+      const sourcePlayerId = key.split(':')[1]
+      result.push({
+        type: 'commanderDamage',
+        value,
+        sourcePlayerId,
+        isBuiltin: true,
+      })
+    } else {
+      // Custom counter
+      result.push({
+        type: key,
+        value,
+        isBuiltin: false,
+      })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Modify a player counter (poison, commander damage, custom)
+ */
+export function modifyPlayerCounter(
+  playerId: string,
+  counterType: string,
+  delta: number,
+  sourcePlayerId?: string,
+  actionPlayerId?: string
+): void {
+  const counters = getPlayerCounters(playerId)
+
+  // For commander damage, include source player in key
+  const counterKey = counterType === 'commanderDamage' && sourcePlayerId
+    ? `commanderDamage:${sourcePlayerId}`
+    : counterType
+
+  const current = counters[counterKey] || 0
+  const newValue = Math.max(0, current + delta)
+
+  const updatedCounters = { ...counters }
+  if (newValue === 0) {
+    delete updatedCounters[counterKey]
+  } else {
+    updatedCounters[counterKey] = newValue
+  }
+
+  playerCountersMap.set(playerId, updatedCounters)
+
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'player_counter_modified', {
+      playerId,
+      counterType,
+      sourcePlayerId,
+      delta,
+      newValue,
+    })
+  }
+}
+
+/**
+ * Delete a specific player counter
+ */
+export function deletePlayerCounter(
+  playerId: string,
+  counterKey: string,
+  actionPlayerId?: string
+): void {
+  const counters = getPlayerCounters(playerId)
+  const updatedCounters = { ...counters }
+  delete updatedCounters[counterKey]
+
+  playerCountersMap.set(playerId, updatedCounters)
+
+  if (actionPlayerId) {
+    logEvent(actionPlayerId, 'player_counter_deleted', {
+      playerId,
+      counterKey,
+    })
+  }
+}
+
+/**
+ * Get recent custom player counter types (for quick access in UI)
+ */
+export function getRecentPlayerCounterTypes(): string[] {
+  const allTypes = new Set<string>()
+
+  playerCountersMap.forEach((counters) => {
+    Object.keys(counters).forEach(key => {
+      // Exclude built-in types
+      if (key !== 'poison' && !key.startsWith('commanderDamage:')) {
+        allTypes.add(key)
+      }
+    })
+  })
+
+  return Array.from(allTypes)
 }
 
 /**
@@ -1100,184 +1225,6 @@ export function deleteCard(cardId: string, playerId?: string): void {
 }
 
 // ============================================================================
-// PLAYER COUNTERS (poison, commander damage, custom)
-// ============================================================================
-
-/**
- * Get all counters for a player
- */
-export function getPlayerCounters(playerId: string): Array<{
-  type: string
-  value: number
-  sourcePlayerId?: string
-  isBuiltin: boolean
-}> {
-  const counters: Array<{
-    type: string
-    value: number
-    sourcePlayerId?: string
-    isBuiltin: boolean
-  }> = []
-
-  playerCountersMap.forEach((counter, key) => {
-    // Key format: ${playerId}-${type} or ${playerId}-${type}-${sourcePlayerId}
-    if (key.startsWith(`${playerId}-`)) {
-      const isBuiltin = counter.type === 'poison' || counter.type === 'commanderDamage'
-      counters.push({
-        type: counter.type,
-        value: counter.value,
-        sourcePlayerId: counter.sourcePlayerId,
-        isBuiltin
-      })
-    }
-  })
-
-  return counters
-}
-
-/**
- * Modify a player counter (builtin or custom)
- */
-export function modifyPlayerCounter(
-  playerId: string,
-  counterType: string,
-  delta: number,
-  sourcePlayerId?: string,
-  actionPlayerId?: string
-): void {
-  // Build the key
-  const key = sourcePlayerId
-    ? `${playerId}-${counterType}-${sourcePlayerId}`
-    : `${playerId}-${counterType}`
-
-  const existing = playerCountersMap.get(key)
-  const currentValue = existing?.value ?? 0
-  const newValue = Math.max(0, currentValue + delta)
-
-  if (newValue === 0) {
-    // Remove counter if it reaches 0
-    playerCountersMap.delete(key)
-  } else {
-    // Update counter
-    playerCountersMap.set(key, {
-      type: counterType,
-      value: newValue,
-      sourcePlayerId
-    })
-  }
-
-  // Track counter type usage (for autocomplete suggestions)
-  counterTypesMap.set(`player:${counterType}`, true)
-
-  // Log the change
-  if (actionPlayerId) {
-    logEvent(actionPlayerId, 'player_counter_modified', {
-      playerId,
-      counterType,
-      delta,
-      newValue,
-      sourcePlayerId
-    })
-  }
-}
-
-/**
- * Delete a player counter completely
- */
-export function deletePlayerCounter(
-  playerId: string,
-  counterType: string,
-  sourcePlayerId?: string,
-  actionPlayerId?: string
-): void {
-  const key = sourcePlayerId
-    ? `${playerId}-${counterType}-${sourcePlayerId}`
-    : `${playerId}-${counterType}`
-
-  playerCountersMap.delete(key)
-
-  if (actionPlayerId) {
-    logEvent(actionPlayerId, 'player_counter_deleted', {
-      playerId,
-      counterType,
-      sourcePlayerId
-    })
-  }
-}
-
-/**
- * Get the value of a specific player counter
- */
-export function getPlayerCounterValue(
-  playerId: string,
-  counterType: string,
-  sourcePlayerId?: string
-): number {
-  const key = sourcePlayerId
-    ? `${playerId}-${counterType}-${sourcePlayerId}`
-    : `${playerId}-${counterType}`
-
-  const counter = playerCountersMap.get(key)
-  return counter?.value ?? 0
-}
-
-/**
- * Check if a player has lost due to counter thresholds
- */
-export function checkPlayerLoss(playerId: string): {
-  hasLost: boolean
-  reason?: string
-} {
-  // Check poison counters
-  const poisonCount = getPlayerCounterValue(playerId, 'poison')
-  if (poisonCount >= BUILTIN_PLAYER_COUNTERS.poison.loseAt) {
-    return {
-      hasLost: true,
-      reason: 'Poison counters'
-    }
-  }
-
-  // Check commander damage from any opponent
-  const allCounters = getPlayerCounters(playerId)
-  const commanderDamageCounters = allCounters.filter(c => c.type === 'commanderDamage')
-
-  for (const counter of commanderDamageCounters) {
-    if (counter.value >= BUILTIN_PLAYER_COUNTERS.commanderDamage.loseAt) {
-      const sourcePlayer = counter.sourcePlayerId
-        ? playersMap.get(counter.sourcePlayerId)
-        : null
-      const sourceName = sourcePlayer?.name || 'opponent'
-
-      return {
-        hasLost: true,
-        reason: `Commander damage from ${sourceName}`
-      }
-    }
-  }
-
-  return { hasLost: false }
-}
-
-/**
- * Get recently used custom counter types in this room
- */
-export function getRecentPlayerCounterTypes(): string[] {
-  const types = new Set<string>()
-
-  counterTypesMap.forEach((_, key) => {
-    if (key.startsWith('player:')) {
-      const type = key.substring(7) // Remove 'player:' prefix
-      // Skip builtin types
-      if (type !== 'poison' && type !== 'commanderDamage') {
-        types.add(type)
-      }
-    }
-  })
-
-  return Array.from(types)
-}
-
-// ============================================================================
 // WEBRTC PROVIDER FOR REAL-TIME SYNC
 // ============================================================================
 
@@ -1738,4 +1685,190 @@ export function applyDeckToPlayer(playerId: string, deck: StoredDeck): void {
     deckName: deck.name,
     cardCount: deck.cardCount,
   })
+}
+
+// ============================================================================
+// UNDOABLE WRAPPERS
+// ============================================================================
+
+/**
+ * Tap/untap a card (with undo support)
+ */
+export function setCardTappedUndoable(cardId: string, tapped: boolean, playerId: string): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const previousTapped = card.tapped
+  pushUndoAction(playerId, {
+    revert: () => setCardTapped(cardId, previousTapped, playerId),
+    description: `${tapped ? 'tap' : 'untap'} ${card.oracleId}`,
+  })
+
+  setCardTapped(cardId, tapped, playerId)
+}
+
+/**
+ * Modify life total (with undo support)
+ */
+export function modifyLifeTotalUndoable(targetPlayerId: string, delta: number, actionPlayerId: string): void {
+  pushUndoAction(actionPlayerId, {
+    revert: () => modifyLifeTotal(targetPlayerId, -delta, actionPlayerId),
+    description: `life change ${delta > 0 ? '+' : ''}${delta}`,
+  })
+
+  modifyLifeTotal(targetPlayerId, delta, actionPlayerId)
+}
+
+/**
+ * Set life total (with undo support)
+ */
+export function setLifeTotalUndoable(targetPlayerId: string, newTotal: number, actionPlayerId: string): void {
+  const player = playersMap.get(targetPlayerId)
+  if (!player) return
+
+  const oldTotal = player.lifeTotal
+  pushUndoAction(actionPlayerId, {
+    revert: () => setLifeTotal(targetPlayerId, oldTotal, actionPlayerId),
+    description: `set life to ${newTotal}`,
+  })
+
+  setLifeTotal(targetPlayerId, newTotal, actionPlayerId)
+}
+
+/**
+ * Modify card counters (with undo support)
+ */
+export function modifyCountersUndoable(cardId: string, counterType: string, delta: number, playerId: string): void {
+  pushUndoAction(playerId, {
+    revert: () => modifyCounters(cardId, counterType, -delta, playerId),
+    description: `counter ${counterType} ${delta > 0 ? '+' : ''}${delta}`,
+  })
+
+  modifyCounters(cardId, counterType, delta, playerId)
+}
+
+/**
+ * Modify player counter (with undo support)
+ */
+export function modifyPlayerCounterUndoable(
+  targetPlayerId: string,
+  counterType: string,
+  delta: number,
+  sourcePlayerId: string | undefined,
+  actionPlayerId: string
+): void {
+  pushUndoAction(actionPlayerId, {
+    revert: () => modifyPlayerCounter(targetPlayerId, counterType, -delta, sourcePlayerId, actionPlayerId),
+    description: `player counter ${counterType} ${delta > 0 ? '+' : ''}${delta}`,
+  })
+
+  modifyPlayerCounter(targetPlayerId, counterType, delta, sourcePlayerId, actionPlayerId)
+}
+
+/**
+ * Create token (with undo support)
+ */
+export function createTokenUndoable(playerId: string, tokenName: string, quantity: number, imageUrl?: string): void {
+  const battlefieldZoneId = `battlefield-${playerId}`
+  const nextOrder = getNextOrderInZone(battlefieldZoneId)
+  const createdTokenIds: string[] = []
+
+  for (let i = 0; i < quantity; i++) {
+    const tokenId = `${playerId}-token-${Date.now()}-${i}-${crypto.randomUUID()}`
+    createdTokenIds.push(tokenId)
+
+    cardsMap.set(tokenId, {
+      oracleId: tokenName,
+      owner: playerId,
+      zoneId: battlefieldZoneId,
+      order: nextOrder + i,
+      faceDown: false,
+      tapped: false,
+      counters: {},
+      attachments: [],
+      metadata: { isToken: true, imageUrl },
+      v: 0,
+    })
+  }
+
+  pushUndoAction(playerId, {
+    revert: () => {
+      createdTokenIds.forEach(tokenId => deleteCard(tokenId, playerId))
+    },
+    description: `create ${quantity} ${tokenName} token(s)`,
+  })
+
+  logEvent(playerId, 'token_created', { tokenName, quantity })
+}
+
+/**
+ * Move card to zone with position (with undo support)
+ */
+export function moveCardToZoneUndoable(
+  cardId: string,
+  targetZoneId: string,
+  position: 'top' | 'bottom' | 'auto' = 'auto',
+  playerId: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const oldZoneId = card.zoneId
+  const oldOrder = card.order
+  const oldTapped = card.tapped
+
+  pushUndoAction(playerId, {
+    revert: () => {
+      // Move back and restore tapped state
+      moveCard(cardId, oldZoneId, oldOrder, playerId, true)
+      // Always restore the tapped state (don't compare to current state)
+      setCardTapped(cardId, oldTapped, playerId)
+    },
+    description: `move ${card.oracleId}`,
+  })
+
+  moveCardToZone(cardId, targetZoneId, position, playerId)
+}
+
+/**
+ * Reorder card (with undo support)
+ */
+export function reorderCardUndoable(
+  cardId: string,
+  targetZoneId: string,
+  insertBeforeCardId: string | null,
+  playerId: string
+): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  const oldZoneId = card.zoneId
+  const oldOrder = card.order
+
+  pushUndoAction(playerId, {
+    revert: () => moveCard(cardId, oldZoneId, oldOrder, playerId, true),
+    description: `reorder ${card.oracleId}`,
+  })
+
+  reorderCard(cardId, targetZoneId, insertBeforeCardId, playerId)
+}
+
+/**
+ * Delete card (with undo support) - primarily for tokens
+ */
+export function deleteCardUndoable(cardId: string, playerId: string): void {
+  const card = cardsMap.get(cardId)
+  if (!card) return
+
+  // Capture full card state for restoration
+  const cardState = { ...card }
+
+  pushUndoAction(playerId, {
+    revert: () => {
+      cardsMap.set(cardId, cardState)
+    },
+    description: `delete ${card.oracleId}`,
+  })
+
+  deleteCard(cardId, playerId)
 }

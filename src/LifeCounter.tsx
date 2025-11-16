@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { modifyLifeTotal } from './store'
+import { modifyLifeTotalUndoable } from './store'
 
 interface LifeCounterProps {
   playerId: string;
@@ -19,11 +19,11 @@ export function LifeCounter({
   const [showModal, setShowModal] = useState(false)
 
   const handleModify = (delta: number) => {
-    modifyLifeTotal(playerId, delta, currentPlayerId)
+    modifyLifeTotalUndoable(playerId, delta, currentPlayerId)
   }
 
   const handleCustomAmount = (amount: number) => {
-    modifyLifeTotal(playerId, amount, currentPlayerId)
+    modifyLifeTotalUndoable(playerId, amount, currentPlayerId)
     setShowModal(false)
   }
 

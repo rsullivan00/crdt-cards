@@ -1,4 +1,4 @@
-import { getPlayerCounters, BUILTIN_PLAYER_COUNTERS, playersMap } from './store'
+import { getPlayerCountersArray, BUILTIN_PLAYER_COUNTERS, playersMap } from './store'
 
 interface PlayerCountersDisplayProps {
   playerId: string
@@ -6,7 +6,7 @@ interface PlayerCountersDisplayProps {
 }
 
 export function PlayerCountersDisplay({ playerId, onClick }: PlayerCountersDisplayProps) {
-  const counters = getPlayerCounters(playerId)
+  const counters = getPlayerCountersArray(playerId)
 
   // Don't render anything if no counters
   if (counters.length === 0) {

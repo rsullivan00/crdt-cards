@@ -27,8 +27,9 @@ import {
   STARTER_DECKS,
   importFromLocalFile,
   getSelectedCardIds,
-  setCardTapped,
+  setCardTappedUndoable,
 } from './store'
+import { performUndo } from './undo'
 import { Zone } from './Zone'
 import { JoinModal } from './JoinModal'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -144,15 +145,23 @@ function App() {
 
     updateUI()
 
-    // Keyboard handler for "t" key to tap/untap selected cards
+    // Keyboard handlers
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle "t" key if not typing in an input/textarea
-      if (e.key === 't' || e.key === 'T') {
-        const activeElement = document.activeElement
-        if (activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA') {
-          return // Don't intercept if typing in a text field
-        }
+      const activeElement = document.activeElement
+      const isTyping = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA'
 
+      // Ctrl+Z: Undo last action
+      if (e.ctrlKey && e.key === 'z' && !isTyping && currentPlayerId) {
+        e.preventDefault()
+        const didUndo = performUndo(currentPlayerId)
+        if (didUndo) {
+          console.log('Undid last action')
+        }
+        return
+      }
+
+      // T key: Tap/untap selected cards
+      if ((e.key === 't' || e.key === 'T') && !isTyping) {
         const selectedCards = getSelectedCardIds()
         if (selectedCards.size === 0 || !currentPlayerId) return
 
@@ -175,7 +184,7 @@ function App() {
           selectedCards.forEach(selectedCardId => {
             const card = cardsMapData.get(selectedCardId) as CardType
             if (card && card.zoneId.startsWith('battlefield-')) {
-              setCardTapped(selectedCardId, newTappedState, currentPlayerId)
+              setCardTappedUndoable(selectedCardId, newTappedState, currentPlayerId)
             }
           })
         }

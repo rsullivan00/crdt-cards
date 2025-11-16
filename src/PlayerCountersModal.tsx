@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
-  getPlayerCounters,
-  modifyPlayerCounter,
+  getPlayerCountersArray,
+  modifyPlayerCounterUndoable,
   deletePlayerCounter,
   playersMap,
   BUILTIN_PLAYER_COUNTERS,
@@ -30,7 +30,7 @@ export function PlayerCountersModal({
   const player = playersMap.get(playerId)
   const playerName = player?.name || playerId
 
-  const counters = getPlayerCounters(playerId)
+  const counters = getPlayerCountersArray(playerId)
   const recentCustomTypes = getRecentPlayerCounterTypes()
 
   // Group counters by type
@@ -49,13 +49,13 @@ export function PlayerCountersModal({
   const handleAddCustomCounter = () => {
     if (!customCounterName.trim()) return
 
-    modifyPlayerCounter(playerId, customCounterName.trim(), 1, undefined, currentPlayerId)
+    modifyPlayerCounterUndoable(playerId, customCounterName.trim(), 1, undefined, currentPlayerId)
     setCustomCounterName('')
     setShowAddCustom(false)
   }
 
   const handleAddCommanderDamage = (sourcePlayerId: string) => {
-    modifyPlayerCounter(playerId, 'commanderDamage', 0, sourcePlayerId, currentPlayerId)
+    modifyPlayerCounterUndoable(playerId, 'commanderDamage', 0, sourcePlayerId, currentPlayerId)
     setShowAddCommanderDamage(false)
   }
 
@@ -140,7 +140,7 @@ export function PlayerCountersModal({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <button
                 onClick={() =>
-                  modifyPlayerCounter(playerId, 'poison', -1, undefined, currentPlayerId)
+                  modifyPlayerCounterUndoable(playerId, 'poison', -1, undefined, currentPlayerId)
                 }
                 style={{
                   width: '32px',
@@ -168,7 +168,7 @@ export function PlayerCountersModal({
               </span>
               <button
                 onClick={() =>
-                  modifyPlayerCounter(playerId, 'poison', 1, undefined, currentPlayerId)
+                  modifyPlayerCounterUndoable(playerId, 'poison', 1, undefined, currentPlayerId)
                 }
                 style={{
                   width: '32px',
@@ -187,7 +187,7 @@ export function PlayerCountersModal({
               {poisonCounters.length > 0 && poisonCounters[0].value > 0 && (
                 <button
                   onClick={() =>
-                    deletePlayerCounter(playerId, 'poison', undefined, currentPlayerId)
+                    deletePlayerCounter(playerId, 'poison', currentPlayerId)
                   }
                   style={{
                     width: '32px',
@@ -253,7 +253,7 @@ export function PlayerCountersModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
                     onClick={() =>
-                      modifyPlayerCounter(
+                      modifyPlayerCounterUndoable(
                         playerId,
                         'commanderDamage',
                         -1,
@@ -288,7 +288,7 @@ export function PlayerCountersModal({
                   </span>
                   <button
                     onClick={() =>
-                      modifyPlayerCounter(
+                      modifyPlayerCounterUndoable(
                         playerId,
                         'commanderDamage',
                         1,
@@ -315,8 +315,7 @@ export function PlayerCountersModal({
                       onClick={() =>
                         deletePlayerCounter(
                           playerId,
-                          'commanderDamage',
-                          opponent.id,
+                          `commanderDamage:${opponent.id}`,
                           currentPlayerId
                         )
                       }
@@ -370,7 +369,7 @@ export function PlayerCountersModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
                     onClick={() =>
-                      modifyPlayerCounter(
+                      modifyPlayerCounterUndoable(
                         playerId,
                         counter.type,
                         -1,
@@ -404,7 +403,7 @@ export function PlayerCountersModal({
                   </span>
                   <button
                     onClick={() =>
-                      modifyPlayerCounter(
+                      modifyPlayerCounterUndoable(
                         playerId,
                         counter.type,
                         1,
@@ -427,14 +426,17 @@ export function PlayerCountersModal({
                     +
                   </button>
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      // For custom counters, the counterKey is just the type
+                      const counterKey = counter.sourcePlayerId
+                        ? `${counter.type}:${counter.sourcePlayerId}`
+                        : counter.type
                       deletePlayerCounter(
                         playerId,
-                        counter.type,
-                        counter.sourcePlayerId,
+                        counterKey,
                         currentPlayerId
                       )
-                    }
+                    }}
                     style={{
                       width: '32px',
                       height: '32px',
