@@ -1061,6 +1061,45 @@ export function shuffleDeck(playerId: string): void {
 }
 
 /**
+ * Constants for battlefield auto-positioning
+ */
+const BATTLEFIELD_START_X = 20
+const BATTLEFIELD_START_Y = 20
+const CASCADE_OFFSET_X = 12
+const CASCADE_OFFSET_Y = 15
+
+/**
+ * Get the next cascade position for a card on the battlefield
+ */
+function getNextCascadePosition(zoneId: string): { x: number; y: number } {
+  // Find all cards in the battlefield zone that have positions
+  const zoneCards = getCardsInZone(zoneId).filter(card => card.position)
+
+  if (zoneCards.length === 0) {
+    // Empty battlefield, start at origin
+    return { x: BATTLEFIELD_START_X, y: BATTLEFIELD_START_Y }
+  }
+
+  // Find the card with the highest order (most recently placed)
+  // The order field acts as z-index, so higher order = more recent
+  let maxCard = zoneCards[0]
+  let maxOrder = maxCard.order
+
+  for (const card of zoneCards) {
+    if (card.order > maxOrder) {
+      maxOrder = card.order
+      maxCard = card
+    }
+  }
+
+  // Cascade from the most recently placed card
+  return {
+    x: (maxCard.position?.x || BATTLEFIELD_START_X) + CASCADE_OFFSET_X,
+    y: (maxCard.position?.y || BATTLEFIELD_START_Y) + CASCADE_OFFSET_Y,
+  }
+}
+
+/**
  * Move a card to a specific zone with position (top/bottom for deck)
  */
 export function moveCardToZone(
@@ -1096,6 +1135,12 @@ export function moveCardToZone(
   const isLeavingBattlefield = card.zoneId.startsWith('battlefield-')
   const isGoingToBattlefield = targetZoneId.startsWith('battlefield-')
 
+  // If going to battlefield without an existing position, assign cascade position
+  let newPosition = card.position
+  if (isGoingToBattlefield && !card.position) {
+    newPosition = getNextCascadePosition(targetZoneId)
+  }
+
   // If leaving battlefield and card is tapped, untap it silently as part of the move
   if (isLeavingBattlefield && !isGoingToBattlefield && card.tapped) {
     const oldZoneId = card.zoneId
@@ -1105,6 +1150,7 @@ export function moveCardToZone(
       tapped: false,  // Untap silently
       zoneId: targetZoneId,
       order: newOrder,
+      position: isGoingToBattlefield ? newPosition : undefined, // Clear position if leaving battlefield
       v: card.v + 1,
     })
 
@@ -1119,8 +1165,26 @@ export function moveCardToZone(
       })
     }
   } else {
-    // Normal move without auto-untap
-    moveCard(cardId, targetZoneId, newOrder, playerId)
+    // Normal move - possibly with auto-positioned battlefield entry
+    const oldZoneId = card.zoneId
+
+    cardsMap.set(cardId, {
+      ...card,
+      zoneId: targetZoneId,
+      order: newOrder,
+      position: isGoingToBattlefield ? newPosition : undefined, // Set position for battlefield, clear for other zones
+      v: card.v + 1,
+    })
+
+    if (playerId) {
+      logEvent(playerId, 'card_moved', {
+        cardId,
+        oracleId: card.oracleId,
+        from: oldZoneId,
+        to: targetZoneId,
+        order: newOrder,
+      })
+    }
   }
 }
 
@@ -1190,6 +1254,9 @@ export function createToken(
   const battlefieldZoneId = `battlefield-${playerId}`
   const nextOrder = getNextOrderInZone(battlefieldZoneId)
 
+  // Get initial cascade position from existing cards
+  let position = getNextCascadePosition(battlefieldZoneId)
+
   for (let i = 0; i < quantity; i++) {
     const tokenId = `${playerId}-token-${Date.now()}-${i}-${crypto.randomUUID()}`
 
@@ -1203,8 +1270,16 @@ export function createToken(
       counters: {},
       attachments: [],
       metadata: { isToken: true, imageUrl },
+      position: { x: position.x, y: position.y }, // Add cascade position
       v: 0,
     })
+
+    // Cascade position for next token
+    // For subsequent tokens in this batch, cascade from the token we just added
+    position = {
+      x: position.x + CASCADE_OFFSET_X,
+      y: position.y + CASCADE_OFFSET_Y,
+    }
   }
 
   logEvent(playerId, 'token_created', { tokenName, quantity })
@@ -1770,35 +1845,32 @@ export function modifyPlayerCounterUndoable(
  */
 export function createTokenUndoable(playerId: string, tokenName: string, quantity: number, imageUrl?: string): void {
   const battlefieldZoneId = `battlefield-${playerId}`
-  const nextOrder = getNextOrderInZone(battlefieldZoneId)
-  const createdTokenIds: string[] = []
 
-  for (let i = 0; i < quantity; i++) {
-    const tokenId = `${playerId}-token-${Date.now()}-${i}-${crypto.randomUUID()}`
-    createdTokenIds.push(tokenId)
+  // Capture existing card IDs before creating tokens
+  const beforeCardIds = new Set(
+    Array.from(cardsMap.entries())
+      .filter(([_, card]) => card.zoneId === battlefieldZoneId)
+      .map(([id]) => id)
+  )
 
-    cardsMap.set(tokenId, {
-      oracleId: tokenName,
-      owner: playerId,
-      zoneId: battlefieldZoneId,
-      order: nextOrder + i,
-      faceDown: false,
-      tapped: false,
-      counters: {},
-      attachments: [],
-      metadata: { isToken: true, imageUrl },
-      v: 0,
-    })
-  }
+  // Call the main implementation (which includes positioning logic)
+  createToken(playerId, tokenName, quantity, imageUrl)
 
+  // Find the newly created tokens
+  const createdTokenIds = Array.from(cardsMap.entries())
+    .filter(([id, card]) =>
+      card.zoneId === battlefieldZoneId &&
+      !beforeCardIds.has(id)
+    )
+    .map(([id]) => id)
+
+  // Add undo action
   pushUndoAction(playerId, {
     revert: () => {
       createdTokenIds.forEach(tokenId => deleteCard(tokenId, playerId))
     },
     description: `create ${quantity} ${tokenName} token(s)`,
   })
-
-  logEvent(playerId, 'token_created', { tokenName, quantity })
 }
 
 /**
