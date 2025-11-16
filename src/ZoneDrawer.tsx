@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Zone } from './Zone'
 import { Card as CardType } from './store'
+import { ZoneSearchBar } from './ZoneSearchBar'
 
 interface ZoneDrawerProps {
   isOpen: boolean
@@ -22,6 +24,26 @@ export function ZoneDrawer({
   isInteractive,
   viewerPlayerId,
 }: ZoneDrawerProps) {
+  const [graveyardSearchOpen, setGraveyardSearchOpen] = useState(false)
+  const [graveyardSearchTerm, setGraveyardSearchTerm] = useState('')
+  const [exileSearchOpen, setExileSearchOpen] = useState(false)
+  const [exileSearchTerm, setExileSearchTerm] = useState('')
+
+  // Filter cards based on search terms
+  const filteredGraveyardCards = graveyardSearchTerm
+    ? graveyardCards.filter(({ card }) => {
+        const name = card.metadata?.name || card.oracleId
+        return name.toLowerCase().includes(graveyardSearchTerm.toLowerCase())
+      })
+    : graveyardCards
+
+  const filteredExileCards = exileSearchTerm
+    ? exileCards.filter(({ card }) => {
+        const name = card.metadata?.name || card.oracleId
+        return name.toLowerCase().includes(exileSearchTerm.toLowerCase())
+      })
+    : exileCards
+
   if (!isOpen) return null
 
   return (
@@ -103,26 +125,81 @@ export function ZoneDrawer({
             padding: '1rem',
           }}
         >
-          <Zone
-            zoneId={`graveyard-${playerId}`}
-            zoneName="Graveyard"
-            zoneType="graveyard"
-            cards={graveyardCards}
-            playerColor={playerColor}
-            playerId={playerId}
-            isInteractive={isInteractive}
-            viewerPlayerId={viewerPlayerId}
-          />
-          <Zone
-            zoneId={`exile-${playerId}`}
-            zoneName="Exile"
-            zoneType="exile"
-            cards={exileCards}
-            playerColor={playerColor}
-            playerId={playerId}
-            isInteractive={isInteractive}
-            viewerPlayerId={viewerPlayerId}
-          />
+          {/* Graveyard Zone */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.25rem 0.5rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '6px',
+              }}
+            >
+              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold', flex: 1 }}>
+                💀 Graveyard ({graveyardCards.length}
+                {graveyardSearchTerm && `, showing ${filteredGraveyardCards.length}`})
+              </h4>
+              <ZoneSearchBar
+                isOpen={graveyardSearchOpen}
+                searchTerm={graveyardSearchTerm}
+                onSearchChange={setGraveyardSearchTerm}
+                onToggle={() => setGraveyardSearchOpen(!graveyardSearchOpen)}
+                resultCount={filteredGraveyardCards.length}
+                totalCount={graveyardCards.length}
+              />
+            </div>
+            <Zone
+              zoneId={`graveyard-${playerId}`}
+              zoneName=""
+              zoneType="graveyard"
+              cards={filteredGraveyardCards}
+              playerColor={playerColor}
+              playerId={playerId}
+              isInteractive={isInteractive}
+              viewerPlayerId={viewerPlayerId}
+              showHeader={false}
+            />
+          </div>
+
+          {/* Exile Zone */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.25rem 0.5rem',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '6px',
+              }}
+            >
+              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold', flex: 1 }}>
+                🚫 Exile ({exileCards.length}
+                {exileSearchTerm && `, showing ${filteredExileCards.length}`})
+              </h4>
+              <ZoneSearchBar
+                isOpen={exileSearchOpen}
+                searchTerm={exileSearchTerm}
+                onSearchChange={setExileSearchTerm}
+                onToggle={() => setExileSearchOpen(!exileSearchOpen)}
+                resultCount={filteredExileCards.length}
+                totalCount={exileCards.length}
+              />
+            </div>
+            <Zone
+              zoneId={`exile-${playerId}`}
+              zoneName=""
+              zoneType="exile"
+              cards={filteredExileCards}
+              playerColor={playerColor}
+              playerId={playerId}
+              isInteractive={isInteractive}
+              viewerPlayerId={viewerPlayerId}
+              showHeader={false}
+            />
+          </div>
         </div>
       </div>
 
