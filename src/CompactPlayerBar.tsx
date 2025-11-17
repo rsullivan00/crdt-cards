@@ -22,9 +22,8 @@ export function CompactPlayerBar({
     return (
       <div
         style={{
-          backgroundColor: '#f5f5f5',
+          backgroundColor: 'transparent',
           padding: '0.75rem 1rem',
-          borderBottom: '1px solid #ddd',
           textAlign: 'center',
           fontSize: '0.875rem',
           color: '#666',
@@ -38,13 +37,13 @@ export function CompactPlayerBar({
   return (
     <div
       style={{
-        backgroundColor: '#f9f9f9',
-        borderBottom: '2px solid #ddd',
+        backgroundColor: 'transparent',
         display: 'flex',
         gap: '1rem',
-        padding: '1rem',
+        padding: '0.5rem 1rem',
         overflowX: 'auto',
-        minHeight: '200px',
+        overflowY: 'visible',
+        pointerEvents: 'none',
       }}
     >
       {players.map(({ id, player }) => {
@@ -81,6 +80,7 @@ export function CompactPlayerBar({
                 : isCurrentTurn
                 ? `0 0 20px ${getPlayerColor(id)}80`
                 : '0 2px 8px rgba(0,0,0,0.1)',
+              pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-4px)'

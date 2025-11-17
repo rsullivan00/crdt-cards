@@ -461,25 +461,6 @@ function App() {
         </div>
       </div>
 
-      {/* Opponent Bar - Only show in compact mode */}
-      {layoutMode === 'compact' && (
-        <CompactPlayerBar
-          players={players}
-          currentPlayerId={currentPlayerId}
-          viewingPlayerId={viewingOpponentId || currentPlayerId}
-          currentTurnPlayerId={currentTurnPlayerId}
-          onSelectPlayer={(playerId) => {
-            // If clicking on current player, reset to their view
-            if (playerId === currentPlayerId) {
-              setViewingOpponentId(null)
-            } else {
-              setViewingOpponentId(playerId)
-            }
-          }}
-          getZoneCards={getZoneCards}
-        />
-      )}
-
       {/* Main Content Area - Conditional based on layout mode */}
       {layoutMode === 'table' ? (
         /* Table Layout - Full screen quadrants */
@@ -520,7 +501,7 @@ function App() {
           }}
         >
           {/* Battlefield - Takes remaining space */}
-          <div style={{ flex: 1, overflow: 'auto', minHeight: 0, position: 'relative' }}>
+          <div style={{ flex: 1, overflow: 'visible', minHeight: 0, position: 'relative' }}>
             <Zone
               zoneId={`battlefield-${displayedPlayerId}`}
               zoneName="Battlefield"
@@ -531,7 +512,36 @@ function App() {
               isInteractive={displayedPlayerId === currentPlayerId}
               viewerPlayerId={currentPlayerId}
               cardSize={cardSize}
+              hideTitle={true}
             />
+
+            {/* Player Bar Overlay - Semi-transparent, positioned over battlefield */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}
+            >
+              <CompactPlayerBar
+                players={players}
+                currentPlayerId={currentPlayerId}
+                viewingPlayerId={viewingOpponentId || currentPlayerId}
+                currentTurnPlayerId={currentTurnPlayerId}
+                onSelectPlayer={(playerId) => {
+                  // If clicking on current player, reset to their view
+                  if (playerId === currentPlayerId) {
+                    setViewingOpponentId(null)
+                  } else {
+                    setViewingOpponentId(playerId)
+                  }
+                }}
+                getZoneCards={getZoneCards}
+              />
+            </div>
 
             {/* Chat Overlay - Positioned over battlefield */}
             <ChatOverlay
@@ -547,10 +557,10 @@ function App() {
               flexShrink: 0,
               borderTop: '2px solid #ddd',
               backgroundColor: '#f5f5f5',
-              padding: '0.75rem 1rem',
+              padding: '0.5rem',
               display: 'grid',
               gridTemplateColumns: '1fr auto auto',
-              gap: '1rem',
+              gap: '0.5rem',
               alignItems: 'center',
             }}
           >
@@ -566,6 +576,7 @@ function App() {
                 isInteractive={displayedPlayerId === currentPlayerId}
                 viewerPlayerId={currentPlayerId}
                 cardSize={cardSize}
+                hideTitle={true}
               />
             </div>
 

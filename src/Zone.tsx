@@ -19,6 +19,7 @@ interface ZoneProps {
   showHeader?: boolean
   opponentPosition?: 'top' | 'left' | 'right' | null
   cardSize?: 'compact' | 'large'
+  hideTitle?: boolean
 }
 
 export function Zone({
@@ -37,6 +38,7 @@ export function Zone({
   showHeader = true,
   opponentPosition = null,
   cardSize = 'compact',
+  hideTitle = false,
 }: ZoneProps) {
   const [numberModal, setNumberModal] = useState<{
     title: string
@@ -556,32 +558,34 @@ export function Zone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.5rem 1rem',
-            marginBottom: '0.5rem',
-            flexShrink: 0,
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
-            {zoneName}
-          </h3>
-          <span
+        {!hideTitle && (
+          <div
             style={{
-              backgroundColor: playerColor,
-              color: 'white',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '12px',
-              fontSize: '0.75rem',
-              fontWeight: 'bold',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.5rem 1rem',
+              marginBottom: '0.5rem',
+              flexShrink: 0,
             }}
           >
-            {cards.length} cards
-          </span>
-        </div>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#333' }}>
+              {zoneName}
+            </h3>
+            <span
+              style={{
+                backgroundColor: playerColor,
+                color: 'white',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '12px',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+              }}
+            >
+              {cards.length} cards
+            </span>
+          </div>
+        )}
 
         {/* Battlefield cards with absolute positioning */}
         <div
@@ -678,19 +682,20 @@ export function Zone({
       style={{
         backgroundColor: isDragOver ? '#e3f2fd' : '#f5f5f5',
         borderRadius: '8px',
-        padding: '1rem',
-        marginBottom: '1rem',
-        minHeight: '200px',
+        padding: hideTitle ? '0.25rem' : '1rem',
+        marginBottom: hideTitle ? '0' : '1rem',
+        minHeight: hideTitle ? '0' : '200px',
         border: isDragOver ? '2px dashed #2196F3' : '2px solid transparent',
         transition: 'all 0.2s ease',
         overflow: 'visible',
+        position: 'relative',
       }}
       data-zone-id={zoneId}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {showHeader && (
+      {showHeader && !hideTitle && (
         <div
           style={{
             display: 'flex',
@@ -717,15 +722,36 @@ export function Zone({
         </div>
       )}
 
+      {/* Card count badge overlay for hideTitle mode */}
+      {hideTitle && cards.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            right: '0.5rem',
+            top: '0.5rem',
+            backgroundColor: playerColor,
+            color: 'white',
+            padding: '0.25rem 0.5rem',
+            borderRadius: '12px',
+            fontSize: '0.75rem',
+            fontWeight: 'bold',
+            zIndex: 100,
+            pointerEvents: 'none',
+          }}
+        >
+          📋 {cards.length}
+        </div>
+      )}
+
       <div
         style={{
           display: 'flex',
           flexWrap: 'nowrap',
           overflowX: 'auto',
           overflowY: 'visible',
-          minHeight: '160px',
+          minHeight: hideTitle ? '0' : '160px',
           alignItems: 'flex-start',
-          paddingTop: '1rem',
+          paddingTop: hideTitle ? '0.25rem' : '1rem',
           paddingBottom: '0.5rem',
         }}
       >
