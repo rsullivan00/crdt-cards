@@ -57,6 +57,7 @@ export function Card({
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const hoverTimeoutRef = useRef<number>()
+  const isDraggingRef = useRef(false)
   const cardIsFaceDown = forceFaceDown || card.faceDown
 
   // Determine if this card is in battlefield zone
@@ -319,6 +320,7 @@ export function Card({
       return
     }
     setIsDragging(true)
+    isDraggingRef.current = true
     isDraggingAnyCard = true
     onDragStateChange?.()
 
@@ -379,17 +381,21 @@ export function Card({
 
   const handleDragEnd = () => {
     setIsDragging(false)
+    isDraggingRef.current = false
     isDraggingAnyCard = false
     onDragStateChange?.()
   }
 
   const handleMouseEnter = () => {
-    // Don't show preview if card is face down, no image, or dragging
-    if (cardIsFaceDown || !imageUrl || isDragging) return
+    // Don't show preview if card is face down or no image
+    if (cardIsFaceDown || !imageUrl) return
 
     // Set timeout to show preview after 600ms
     hoverTimeoutRef.current = window.setTimeout(() => {
-      setShowPreview(true)
+      // Check ref (always current) instead of state (can be stale in closure)
+      if (!isDraggingRef.current && !isDraggingAnyCard) {
+        setShowPreview(true)
+      }
     }, 600)
   }
 
