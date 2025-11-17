@@ -18,6 +18,7 @@ interface ZoneProps {
   zoneId: string
   showHeader?: boolean
   opponentPosition?: 'top' | 'left' | 'right' | null
+  cardSize?: 'compact' | 'large'
 }
 
 export function Zone({
@@ -35,6 +36,7 @@ export function Zone({
   zoneId,
   showHeader = true,
   opponentPosition = null,
+  cardSize = 'compact',
 }: ZoneProps) {
   const [numberModal, setNumberModal] = useState<{
     title: string
@@ -69,6 +71,10 @@ export function Zone({
     return () => observer.disconnect()
   }, [])
 
+  // Calculate card dimensions based on size
+  const cardWidth = cardSize === 'compact' ? 122 : 244
+  const cardHeight = cardSize === 'compact' ? 170 : 340
+
   // Calculate auto-zoom scale
   useEffect(() => {
     if (!isOpponentBattlefield || cards.length === 0 || containerSize.width === 0) {
@@ -78,8 +84,6 @@ export function Zone({
 
     // Calculate bounding box of all cards
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    const cardWidth = 120
-    const cardHeight = 160
 
     cards.forEach(({ card }) => {
       const x = card.position?.x || 0
@@ -317,12 +321,15 @@ export function Zone({
 
     // Find cards within selection rectangle
     const selectedCardIds: string[] = []
+    const halfCardWidth = cardWidth / 2
+    const halfCardHeight = cardHeight / 2
+
     cards.forEach(({ id, card }) => {
       if (!card.position) return
 
       // Check if card center is within selection rectangle
-      const cardCenterX = card.position.x + 60 // Half of card width (120px)
-      const cardCenterY = card.position.y + 80 // Half of card height (160px)
+      const cardCenterX = card.position.x + halfCardWidth
+      const cardCenterY = card.position.y + halfCardHeight
 
       if (
         cardCenterX >= minX &&
@@ -628,6 +635,7 @@ export function Zone({
                   isInteractive={isInteractive}
                   forceFaceDown={false}
                   opponentPosition={opponentPosition}
+                  cardSize={cardSize}
                 />
               ))
             )}
@@ -765,6 +773,7 @@ export function Zone({
                   playerId={viewerPlayerId || playerId}
                   isInteractive={isInteractive}
                   forceFaceDown={shouldHideCard}
+                  cardSize={cardSize}
                 />
               </div>
             )

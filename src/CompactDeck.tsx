@@ -18,6 +18,7 @@ interface CompactDeckProps {
   onExileN: (count: number, faceDown: boolean) => void
   onRevealTop: () => void
   onShuffle: () => void
+  cardSize?: 'compact' | 'large'
 }
 
 export function CompactDeck({
@@ -33,7 +34,11 @@ export function CompactDeck({
   onExileN,
   onRevealTop,
   onShuffle,
+  cardSize = 'compact',
 }: CompactDeckProps) {
+  // Calculate card dimensions based on size
+  const cardWidth = cardSize === 'compact' ? 122 : 244
+  const cardHeight = cardSize === 'compact' ? 170 : 340
   const [showMenu, setShowMenu] = useState(false)
   const [showDrawSubmenu, setShowDrawSubmenu] = useState(false)
   const [showMillSubmenu, setShowMillSubmenu] = useState(false)
@@ -105,8 +110,8 @@ export function CompactDeck({
       <div
         onDoubleClick={handleDoubleClick}
         style={{
-          width: '120px',
-          height: '160px',
+          width: `${cardWidth}px`,
+          height: `${cardHeight}px`,
           backgroundColor: shouldShowReveal && revealedImageUrl ? 'transparent' : '#333',
           backgroundImage: shouldShowReveal && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
           backgroundSize: 'cover',

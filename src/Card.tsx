@@ -26,6 +26,7 @@ interface CardProps {
   isInteractive?: boolean;
   forceFaceDown?: boolean;
   opponentPosition?: 'top' | 'left' | 'right' | null;
+  cardSize?: 'compact' | 'large';
 }
 
 export function Card({
@@ -35,6 +36,7 @@ export function Card({
   isInteractive = true,
   forceFaceDown = false,
   opponentPosition = null,
+  cardSize = 'compact',
 }: CardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false)
@@ -151,9 +153,13 @@ export function Card({
     }
   }
 
+  // Calculate card dimensions based on size preference
+  const cardWidth = cardSize === 'compact' ? 122 : 244
+  const cardHeight = cardSize === 'compact' ? 170 : 340
+
   const cardStyle: React.CSSProperties = {
-    width: '120px',
-    height: '160px',
+    width: `${cardWidth}px`,
+    height: `${cardHeight}px`,
     border: 'none',
     borderRadius: '8px',
     backgroundColor: cardIsFaceDown ? '#333' : '#fff',

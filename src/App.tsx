@@ -87,6 +87,18 @@ function App() {
     localStorage.setItem('crdt-cards-layout-mode', newMode)
   }
 
+  // Card size state
+  const [cardSize, setCardSize] = useState<'compact' | 'large'>(() => {
+    const saved = localStorage.getItem('crdt-cards-card-size')
+    return (saved === 'large' ? 'large' : 'compact') as 'compact' | 'large'
+  })
+
+  const toggleCardSize = () => {
+    const newSize = cardSize === 'compact' ? 'large' : 'compact'
+    setCardSize(newSize)
+    localStorage.setItem('crdt-cards-card-size', newSize)
+  }
+
   useEffect(() => {
     // Check if player already joined this room
     const storageKey = `crdt-cards-player-${getRoomName()}`
@@ -364,6 +376,22 @@ function App() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button
+            onClick={toggleCardSize}
+            style={{
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              backgroundColor: cardSize === 'large' ? '#4CAF50' : '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+            title={`Card Size: ${cardSize === 'compact' ? 'Small' : 'Large'}`}
+          >
+            {cardSize === 'large' ? '🔍 Large' : '🔍 Small'}
+          </button>
+          <button
             onClick={toggleLayoutMode}
             style={{
               padding: '0.5rem 0.75rem',
@@ -502,6 +530,7 @@ function App() {
               playerId={displayedPlayerId}
               isInteractive={displayedPlayerId === currentPlayerId}
               viewerPlayerId={currentPlayerId}
+              cardSize={cardSize}
             />
 
             {/* Chat Overlay - Positioned over battlefield */}
@@ -536,6 +565,7 @@ function App() {
                 playerId={displayedPlayerId}
                 isInteractive={displayedPlayerId === currentPlayerId}
                 viewerPlayerId={currentPlayerId}
+                cardSize={cardSize}
               />
             </div>
 
@@ -559,6 +589,7 @@ function App() {
                       revealTopCard(displayedPlayerId)
                     }}
                     onShuffle={() => shuffleDeck(displayedPlayerId)}
+                    cardSize={cardSize}
                   />
                 ) : (
                   // Simplified deck display for opponents (no menu) - but shows revealed cards
@@ -573,8 +604,8 @@ function App() {
                     return (
                       <div
                         style={{
-                          width: '120px',
-                          height: '160px',
+                          width: '244px',
+                          height: '340px',
                           backgroundColor: shouldShowReveal && revealedImageUrl ? 'transparent' : '#333',
                           backgroundImage: shouldShowReveal && revealedImageUrl ? `url(${revealedImageUrl})` : 'none',
                           backgroundSize: 'cover',
