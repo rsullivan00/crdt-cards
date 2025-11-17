@@ -51,6 +51,7 @@ export interface StoredDeck {
   cardCount: number
   importedAt: number
   cards: Array<{ name: string; quantity: number }>
+  commanders?: string[] // Array of commander card names (first card is commander by default)
 }
 
 // ============================================================================
@@ -1678,6 +1679,9 @@ export async function importFromLocalFile(
       return { success: false, error: 'No cards found in starter deck file' }
     }
 
+    // First card is the commander (Commander deck convention)
+    const commanders = cards.length > 0 ? [cards[0].name] : []
+
     // Create stored deck object
     const deck: StoredDeck = {
       id: crypto.randomUUID(),
@@ -1687,6 +1691,7 @@ export async function importFromLocalFile(
       cardCount,
       importedAt: Date.now(),
       cards,
+      commanders,
     }
 
     // Save to localStorage
@@ -1731,6 +1736,7 @@ function extractMoxfieldId(url: string): string | null {
  */
 export function applyDeckToPlayer(playerId: string, deck: StoredDeck): void {
   const deckZoneId = `deck-${playerId}`
+  const battlefieldZoneId = `battlefield-${playerId}`
 
   // Clear existing deck cards
   const cardsToRemove: string[] = []
@@ -1741,17 +1747,44 @@ export function applyDeckToPlayer(playerId: string, deck: StoredDeck): void {
   })
   cardsToRemove.forEach(cardId => cardsMap.delete(cardId))
 
+  // Track commanders for battlefield placement
+  const commanders = new Set(deck.commanders || [])
+  const commanderCardIds: string[] = []
+
   // Add cards from stored deck
   let order = 0
   for (const { name, quantity } of deck.cards) {
+    const isCommander = commanders.has(name)
+
     for (let i = 0; i < quantity; i++) {
-      addCard(
-        `${playerId}-deck-${name}-${i}`,
-        name,
-        playerId,
-        deckZoneId,
-        order++
-      )
+      const cardId = `${playerId}-deck-${name}-${i}`
+
+      // If this is a commander, only add one copy to battlefield
+      // The rest (if any) go to deck
+      if (isCommander && commanderCardIds.length < commanders.size) {
+        // Add to battlefield with cascade positioning
+        const position = getNextCascadePosition(battlefieldZoneId)
+        const battlefieldOrder = getNextOrderInZone(battlefieldZoneId)
+
+        cardsMap.set(cardId, {
+          oracleId: name,
+          owner: playerId,
+          zoneId: battlefieldZoneId,
+          order: battlefieldOrder,
+          faceDown: false,
+          tapped: false,
+          counters: {},
+          attachments: [],
+          metadata: {},
+          position,
+          v: 0,
+        })
+
+        commanderCardIds.push(cardId)
+      } else {
+        // Add to deck normally
+        addCard(cardId, name, playerId, deckZoneId, order++)
+      }
     }
   }
 
@@ -1759,6 +1792,7 @@ export function applyDeckToPlayer(playerId: string, deck: StoredDeck): void {
   logEvent(playerId, 'deck_imported', {
     deckName: deck.name,
     cardCount: deck.cardCount,
+    commanders: Array.from(commanders),
   })
 }
 

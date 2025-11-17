@@ -1,4 +1,4 @@
-import { getPlayerCountersArray, BUILTIN_PLAYER_COUNTERS, playersMap } from './store'
+import { getPlayerCountersArray, BUILTIN_PLAYER_COUNTERS } from './store'
 
 interface PlayerCountersDisplayProps {
   playerId: string

@@ -23,7 +23,6 @@ export function PlayerCountersModal({
 }: PlayerCountersModalProps) {
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [customCounterName, setCustomCounterName] = useState('')
-  const [showAddCommanderDamage, setShowAddCommanderDamage] = useState(false)
 
   if (!isOpen) return null
 
@@ -52,11 +51,6 @@ export function PlayerCountersModal({
     modifyPlayerCounterUndoable(playerId, customCounterName.trim(), 1, undefined, currentPlayerId)
     setCustomCounterName('')
     setShowAddCustom(false)
-  }
-
-  const handleAddCommanderDamage = (sourcePlayerId: string) => {
-    modifyPlayerCounterUndoable(playerId, 'commanderDamage', 0, sourcePlayerId, currentPlayerId)
-    setShowAddCommanderDamage(false)
   }
 
   return (
